@@ -40,3 +40,4 @@ CMakeCache.txt
 /.qt
 /.vscode
 /stock-tracker_autogen
+/build
