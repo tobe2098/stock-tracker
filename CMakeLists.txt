@@ -17,10 +17,14 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 #Set source files
 set(SOURCES
     src/main.cpp
-)
+    src/mainwindow.cpp
+    src/stock.cpp
+    )
 # Set heaeder files
 set(HEADERS
-)
+    src/mainwindow.hpp
+    src/stock.hpp
+    )
 
 # Add executable
 add_executable(stock-tracker ${SOURCES} ${HEADERS})
