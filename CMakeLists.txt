@@ -10,7 +10,8 @@ set(CMAKE_AUTOUIC ON) # Automatically process .ui files (for Qt Designer forms)
 set(CMAKE_AUTOMOC ON) # Automatically process MOC (Meta-Object Compiler) files
 set(CMAKE_AUTORCC ON) # Automatically process .qrc files (Qt Resource files)
 
-find_package(Qt6 COMPONENTS Widgets REQUIRED)
+find_package(Qt6 COMPONENTS Widgets Charts REQUIRED)
+# find_package(Qt6 COMPONENTS Charts REQUIRED)
 # Set output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -36,6 +37,7 @@ target_include_directories(stock-tracker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 # Link libraries
 target_link_libraries(stock-tracker PRIVATE 
     Qt6::Widgets
+    Qt6::Charts
 )
 # Add this line
 add_compile_definitions(_UCRT)

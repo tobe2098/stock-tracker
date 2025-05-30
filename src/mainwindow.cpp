@@ -22,11 +22,41 @@ MainWindow::MainWindow(QWidget *parent)
     // 2. Create the main layout for the central widget.
     //    We'll use a QVBoxLayout to stack elements vertically.
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget); // Set centralWidget as parent
+    // 2.5 --- Main Layout ---
+    // Instead of directly adding widgets to mainLayout, we'll put them in tabs.
+    // So, mainLayout will contain the QTabWidget and the settings button.
+    // (Adjust the top section layout if settings button is not in addStockLayout)
+
+    // Create the QTabWidget
+    mainTabWidget = new QTabWidget(this);
+    mainLayout->addWidget(mainTabWidget); // Add tabs to the main layout
 
     // 3. Top section: Input for adding stocks
     //    Use an QHBoxLayout to arrange the QLineEdit and QPushButton horizontally.
     QHBoxLayout *addStockLayout = new QHBoxLayout();
 
+ // Create a container widget for our existing stock list UI
+    stockListTab = new QWidget(this);
+    QVBoxLayout *stockListLayout = new QVBoxLayout(stockListTab);
+    // Move existing widgets/layouts into stockListLayout
+    stockListLayout->addLayout(addStockLayout); // The line edit and add button
+    stockListLayout->addWidget(stockListWidget);
+    stockListLayout->addWidget(stockDetailsLabel);
+    mainTabWidget->addTab(stockListTab, "Tracked Stocks"); // Add the list tab
+ // Create a container widget for the chart view
+    chartTab = new QWidget(this);
+    QVBoxLayout *chartLayout = new QVBoxLayout(chartTab);
+    stockChartView = new QChartView(this); // Placeholder for now, QtCharts setup is next.
+    chartLayout->addWidget(stockChartView);
+    mainTabWidget->addTab(chartTab, "Stock Chart"); // Add the chart tab
+
+    // For now, let's just add a placeholder for a heatmap tab.
+    heatmapTab = new QWidget(this);
+    mainTabWidget->addTab(heatmapTab, "Heatmap");
+    // Add the settings button at the bottom of the main layout, or in a toolbar.
+    // For simplicity, let's put it below the tabs for now.
+    settingsButton = new QPushButton("Settings", this);
+    mainLayout->addWidget(settingsButton);
     // Instantiate QLineEdit for stock symbol input
     stockSymbolLineEdit = new QLineEdit(this); // 'this' (MainWindow) is the parent
     stockSymbolLineEdit->setPlaceholderText("Enter stock symbol (e.g., AAPL)");
@@ -59,7 +89,14 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect the 'itemClicked' signal of the stockListWidget to our 'onStockListItemClicked' slot.
     // When an item in the list is clicked, our slot will be called with the clicked item.
     connect(stockListWidget, &QListWidget::itemClicked, this, &MainWindow::onStockListItemClicked);
+    // --- Signal-Slot Connections for new elements ---
+    connect(settingsButton, &QPushButton::clicked, this, &MainWindow::onSettingsButtonClicked);
+    // For chart updates, you'd connect a signal from your data model/fetcher
+    // connect(dataFetcher, &StockDataFetcher::historicalDataReady, this, &MainWindow::onChartDataUpdated);
+    // (This connection would involve your worker thread setup later)
 
+    // Optional: Connect to tab changes if you want to update content dynamically
+    connect(mainTabWidget, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
     // Initial call to update the list display (it will be empty initially)
     updateStockListDisplay();
 }
@@ -151,4 +188,20 @@ void MainWindow::displayStockDetails(const Stock &stock) {
         (stock.getPriceChange() >= 0) ? "green" : "red" // Conditional color
     );
     stockDetailsLabel->setText(details); // Set the HTML text to the label
+}
+// ... implement new slots ...
+void MainWindow::onSettingsButtonClicked() {
+    qDebug() << "Settings button clicked!";
+    // Here you would open a settings dialog or change a settings view.
+}
+
+// void MainWindow::onChartDataUpdated(const QList<QPair<qint64, double>> &historicalData) {
+//     qDebug() << "Chart data updated with" << historicalData.size() << "points.";
+//     // This slot would receive data from your model/fetcher and update the chart.
+//     // We will implement actual chart drawing using QtCharts in a later step.
+// }
+
+void MainWindow::onTabChanged(int index) {
+    qDebug() << "Tab changed to index:" << index << " (" << mainTabWidget->tabText(index) << ")";
+    // You can add logic here to load/refresh data specific to the selected tab.
 }

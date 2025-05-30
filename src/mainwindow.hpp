@@ -10,12 +10,15 @@
 #include <QPushButton>
 #include <QListWidget>
 #include <QLabel>
+#include <QTabWidget> // To create tabs for different views (e.g., list, chart, heatmap)
+#include <QChartView> // For displaying charts (from Qt Charts module)
 // Include layout classes
 #include <QVBoxLayout> // Vertical Box Layout
 #include <QHBoxLayout> // Horizontal Box Layout
 #include <QtGlobal>
 #include <QDateTime>
 #include <QRandomGenerator>
+
 // Include our custom Stock class (Model)
 #include "stock.hpp"
 
@@ -44,7 +47,10 @@ private slots:
     // This slot will be called when an item in the QListWidget is clicked.
     // It takes a QListWidgetItem pointer as an argument, which is provided by the signal.
     void onStockListItemClicked(QListWidgetItem *item);
-
+    void onSettingsButtonClicked(); // New slot for the settings button
+    // void onChartDataUpdated(const QList<QPair<qint64, double>> &historicalData);
+    // You might also consider a slot for when a tab is changed, if needed
+    void onTabChanged(int index);
 private:
     // Declare pointers to our UI widgets.
     // We use pointers because we'll create these widgets dynamically (using 'new')
@@ -53,6 +59,16 @@ private:
     QPushButton *addStockButton;
     QListWidget *stockListWidget;
     QLabel *stockDetailsLabel; // To display details of the selected stock
+
+    QTabWidget *mainTabWidget;
+    QWidget *stockListTab;
+    QWidget *chartTab;
+    QWidget * heatmapTab;
+
+    QChartView *stockChartView;
+
+    QPushButton *settingsButton;
+
 
     // This QList will hold our Stock objects. It represents the "data" part
     // of our Model for now, specifically the collection of tracked stocks.
