@@ -1,7 +1,7 @@
 // src/mainwindow.h
 
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#ifndef _MAINWINDOW_HEADER
+#define _MAINWINDOW_HEADER
 
 // Include necessary Qt base classes
 #include <QMainWindow>
@@ -21,7 +21,7 @@
 
 // Include our custom Stock class (Model)
 #include "stock.hpp"
-
+#include "stockdatafetcher.hpp"
 // Define our MainWindow class, inheriting from QMainWindow
 class MainWindow : public QMainWindow {
     // MANDATORY: This macro enables Qt's meta-object system features
@@ -51,6 +51,10 @@ private slots:
     void onChartDataUpdated(const QList<QPair<qint64, double>> &historicalData);
     // You might also consider a slot for when a tab is changed, if needed
     void onTabChanged(int index);
+
+     // New slots to receive data from StockDataFetcher
+    void onStockDataFetched(const Stock &stock);
+    void onStockDataFetchError(const QString &symbol, const QString &errorString);
 private:
     // Declare pointers to our UI widgets.
     // We use pointers because we'll create these widgets dynamically (using 'new')
@@ -69,7 +73,8 @@ private:
 
     QPushButton *settingsButton;
 
-
+    // Our new data fetcher instance
+    StockDataFetcher *dataFetcher;
     // This QList will hold our Stock objects. It represents the "data" part
     // of our Model for now, specifically the collection of tracked stocks.
     QList<Stock> trackedStocks;
@@ -78,6 +83,8 @@ private:
     // These are regular private member functions.
     void updateStockListDisplay();
     void displayStockDetails(const Stock &stock);
+
+    Stock* findStockBySymbol(const QString& symbol);
 };
 
 #endif // MAINWINDOW_H
