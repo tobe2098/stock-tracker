@@ -13,7 +13,6 @@ const QList<QString>  api_paths { QStringLiteral("/../../api.txt"), QStringLiter
 StockDataFetcher::StockDataFetcher(QObject *parent):
     QObject(parent), manager(new QNetworkAccessManager(this))  // 'this' sets StockDataFetcher as parent, handles deletion
 {
-  //   setAPIKey();
   // Connect the finished signal of the manager to our slot
   connect(manager, &QNetworkAccessManager::finished, this, &StockDataFetcher::onNetworkReplyFinished);
 }
@@ -95,32 +94,6 @@ void StockDataFetcher::fetchStockData(const QString &symbol) {
     return;
   }
 
-  // --- Placeholder API URL ---
-  // In a real application, you would use a real stock API (e.g., Alpha Vantage, Financial Modeling Prep).
-  // These typically require an API key and have rate limits.
-  // For demonstration, we'll simulate a very basic public JSON response.
-  // Replace this with your actual API endpoint if you get an API key.
-  // For example:
-  // QUrl url(QString("https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=%1&apikey=YOUR_API_KEY").arg(symbol));
-  // For now, let's use a very basic mock URL or generate dummy data after a delay.
-  // To keep it simple and focus on the networking mechanism without real API keys,
-  // we'll use a public mock API if available or simulate.
-
-  // Using a mock API for demonstration:
-  // This is a simple mock API that returns fixed data based on symbol.
-  // In a real scenario, you'd substitute with a real financial API.
-  // This example uses a placeholder. You might need to set up a free tier or find a truly public API.
-  // For learning, we'll *simulate* data if a public mock API is too complex/unavailable.
-
-  // *** For this example, let's pretend we're hitting an endpoint that returns dummy data
-  // *** and we'll just parse a very simple JSON structure.
-  // *** In a real app, you'd use a service like api.iex.cloud, polygon.io, alphavantage.co, etc.
-  // *** For instance, a very basic placeholder:
-  // QUrl url(QString("https://api.example.com/stocks/%1/quote").arg(symbol));
-  // *** For this guide, to avoid real API key issues and complex setup,
-  // *** I will create a *dummy URL* and *simulate* the response within onNetworkReplyFinished
-  // *** as if it came from a real network call, for simplicity.
-
   // Use a dummy URL for now. The actual data parsing will be mocked in onNetworkReplyFinished.
   QUrl url(QString("https://finnhub.io/api/v1/quote?symbol=%1&token=%2").arg(symbol).arg(api_key));
   qDebug() << "Requesting data for:" << symbol << "from" << url.toString();
@@ -146,25 +119,25 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
     QByteArray responseData = reply->readAll();
     qDebug() << "Received response for" << symbol << ":" << responseData.data();
 
-    // --- SIMULATED JSON PARSING ---
-    // In a real scenario, you'd parse the actual JSON structure from your chosen API.
-    // For demonstration, let's generate dummy stock data based on the symbol
-    // as if it came from a successful JSON response.
-
-    // Simulating JSON parsing for simplicity, typically you'd do:
-    // QJsonDocument doc = QJsonDocument::fromJson(responseData);
-    // QJsonObject obj = doc.object();
-    // ... then extract values from obj ...
-
-    QRandomGenerator gen(QDateTime::currentMSecsSinceEpoch() / 1000);
-    double           dummyPrice  = 100.0 + (gen() % 2000) / 10.0;  // Price between 100 and 300
-    double           dummyChange = (gen() % 400 - 200) / 10.0;     // Change between -20 and 20
-
-    // Create a dummy Stock object using the fetched symbol
-    // (In a real app, 'name' would also come from the API)
-    Stock fetchedStock(symbol, symbol + " Co.", dummyPrice, dummyChange);
-
-    emit stockDataFetched(fetchedStock);  // Emit signal with the new Stock object
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
+    QJsonObject   jsonObject;
+    if (jsonDoc.isObject()) {
+      jsonObject = jsonDoc.object();
+      //    Stock(QString symbol, QString symbol_name, price_t current_price, price_t price_change, percentage_t percent_change, price_t
+      //    day_high,price_t day_low, price_t day_open, price_t prev_close, time_record_t time)
+      if (!jsonObject["d"].isNull()) {
+        Stock fetchedStock(symbol, symbol + " Co.", jsonObject["c"].toDouble(), jsonObject["d"].toDouble(), jsonObject["dp"].toDouble(),
+                           jsonObject["h"].toDouble(), jsonObject["l"].toDouble(), jsonObject["o"].toDouble(), jsonObject["pc"].toDouble(),
+                           jsonObject["t"].toInteger());
+        emit  stockDataFetched(fetchedStock);  // Emit signal with the new Stock object
+      } else {
+        qDebug() << "Non-existent stock.";
+        emit invalidStockDataFetched("Stock does not exist.");
+      }
+    } else {
+      qDebug() << "Response is not a JSON.";
+      emit invalidStockDataFetched("Network response is not a valid JSON.");
+    }
   }
 
   reply->deleteLater();  // Crucial: delete the reply object when done to prevent memory leaks

@@ -86,6 +86,7 @@ MainWindow::MainWindow(QWidget *parent):
   // Connect the 'clicked' signal of the addStockButton to our 'onAddStockButtonClicked' slot.
   // When the button is clicked, our slot function will be executed.
   connect(addStockButton, &QPushButton::clicked, this, &MainWindow::onAddStockButtonClicked);
+  connect(stockSymbolLineEdit, &QLineEdit::returnPressed, this, &MainWindow::onAddStockButtonClicked);
 
   // Connect the 'itemClicked' signal of the stockListWidget to our 'onStockListItemClicked' slot.
   // When an item in the list is clicked, our slot will be called with the clicked item.
@@ -101,6 +102,7 @@ MainWindow::MainWindow(QWidget *parent):
   // Connect StockDataFetcher signals to MainWindow slots
   connect(dataFetcher, &StockDataFetcher::stockDataFetched, this, &MainWindow::onStockDataFetched);
   connect(dataFetcher, &StockDataFetcher::fetchError, this, &MainWindow::onStockDataFetchError);
+  connect(dataFetcher, &StockDataFetcher::invalidStockDataFetched, this, &MainWindow::onInvalidStockDataFetched);
   // Initial call to update the list display (it will be empty initially)
   updateStockListDisplay();
   dataFetcher->setAPIKey();
@@ -165,13 +167,21 @@ void MainWindow::displayStockDetails(const Stock &stock) {
                       "<b>Symbol:</b> %1<br>"
                       "<b>Name:</b> %2<br>"
                       "<b>Current Price:</b> $%3<br>"
-                      "<b>Price Change:</b> $%4 (<span style='color:%6;'>%5%</span>)"  // Added color for change
+                      "<b>Price Change:</b> $%4 (<span style='color:%6;'>%5%</span>)<br>"  // Added color for change
+                      "<b>Previous day close:</b> $%7, <b>Day open</b>: $%8, <b>Change:</b>(<span style='color:%13;'> %9%</span>)<br>"
+                      "<b>Day high:</b> $%10, <b>Day low:</b> $%11, <b>Change:</b> %12%"
+                      //   "<b>Time and date of record:</b> %13"
                       )
                       .arg(stock.getSymbol(), stock.getName(), QString::number(stock.getCurrentPrice(), 'f', 2),
                            QString::number(stock.getPriceChange(), 'f', 2),
                            QString::number((stock.getPriceChange() / stock.getCurrentPrice()) * 100.0, 'f', 2),
-                           (stock.getPriceChange() >= 0) ? "green" : "red"  // Conditional color
-                      );
+                           (stock.getPriceChange() >= 0) ? "green" : "red",  // Conditional color
+                           QString::number(stock.getDayClose(), 'f', 2), QString::number(stock.getDayOpen(), 'f', 2),
+                           QString::number(100 * (stock.getDayOpen() - stock.getDayClose()) / stock.getDayClose(), 'f', 2),
+                           QString::number(stock.getDayHigh(), 'f', 2), QString::number(stock.getDayLow(), 'f', 2),
+                           QString::number(100 * (stock.getDayHigh() - stock.getDayLow()) / stock.getDayLow(), 'f', 2),
+                           //    (QDateTime::fromSecsSinceEpoch(stock.getLastTimestamp())).toString()
+                           (stock.getDayOpen() - stock.getDayClose() >= 0 ? "green" : "red"));
   stockDetailsLabel->setText(details);  // Set the HTML text to the label
 }
 // ... implement new slots ...
@@ -215,6 +225,10 @@ void MainWindow::onStockDataFetched(const Stock &stock) {
 void MainWindow::onStockDataFetchError(const QString &symbol, const QString &errorString) {
   qWarning() << "Failed to fetch data for" << symbol << ":" << errorString;
   QMessageBox::critical(this, "Network Error", QString("Failed to fetch data for %1:\n%2").arg(symbol, errorString));
+}
+
+void MainWindow::onInvalidStockDataFetched(const QString &error) {
+  QMessageBox::critical(this, "Network Error", error);
 }
 
 // Helper method to find a stock by its symbol in the trackedStocks list

@@ -35,7 +35,7 @@ class StockDataFetcher : public QObject {
   signals:
     // Signal emitted when stock data is successfully fetched
     void stockDataFetched(const Stock &stock);
-
+    void invalidStockDataFetched(const QString &error);
     // Signal emitted if there's an error during fetching
     void fetchError(const QString &symbol, const QString &errorString);
 
