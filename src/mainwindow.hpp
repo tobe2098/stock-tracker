@@ -48,7 +48,7 @@ private slots:
     // It takes a QListWidgetItem pointer as an argument, which is provided by the signal.
     void onStockListItemClicked(QListWidgetItem *item);
     void onSettingsButtonClicked(); // New slot for the settings button
-    // void onChartDataUpdated(const QList<QPair<qint64, double>> &historicalData);
+    void onChartDataUpdated(const QList<QPair<qint64, double>> &historicalData);
     // You might also consider a slot for when a tab is changed, if needed
     void onTabChanged(int index);
 private:

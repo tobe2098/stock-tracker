@@ -6,7 +6,7 @@ int main(int argc, char *argv[]) {
     // QApplication manages the GUI application's control flow and main settings.
     // It handles initialization, finalization, and event loop.
     QApplication app(argc, argv);
-    app.setStyle(QStyleFactory::create("Fusion"));
+    // app.setStyle(QStyleFactory::create("Fusion"));
 
     // Create a QMainWindow, which is a top-level window.
     // It typically has a menu bar, toolbars, a status bar, and a central widget.

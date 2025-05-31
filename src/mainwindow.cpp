@@ -38,11 +38,7 @@ MainWindow::MainWindow(QWidget *parent)
  // Create a container widget for our existing stock list UI
     stockListTab = new QWidget(this);
     QVBoxLayout *stockListLayout = new QVBoxLayout(stockListTab);
-    // Move existing widgets/layouts into stockListLayout
-    stockListLayout->addLayout(addStockLayout); // The line edit and add button
-    stockListLayout->addWidget(stockListWidget);
-    stockListLayout->addWidget(stockDetailsLabel);
-    mainTabWidget->addTab(stockListTab, "Tracked Stocks"); // Add the list tab
+
  // Create a container widget for the chart view
     chartTab = new QWidget(this);
     QVBoxLayout *chartLayout = new QVBoxLayout(chartTab);
@@ -67,19 +63,20 @@ MainWindow::MainWindow(QWidget *parent)
     addStockLayout->addWidget(addStockButton); // Add to the horizontal layout
 
     // Add the horizontal layout to the main vertical layout
-    mainLayout->addLayout(addStockLayout);
 
     // 4. Middle section: List of tracked stocks
     stockListWidget = new QListWidget(this); // 'this' is the parent
-    mainLayout->addWidget(stockListWidget); // Add to the main vertical layout
 
     // 5. Bottom section: Details of selected stock
     stockDetailsLabel = new QLabel("Select a stock to see details.", this); // 'this' is the parent
     stockDetailsLabel->setWordWrap(true); // Enable word wrapping for longer text
     stockDetailsLabel->setFrameStyle(QFrame::Panel | QFrame::Sunken); // Add a simple border
     stockDetailsLabel->setMinimumHeight(100); // Give it some minimum height
-    mainLayout->addWidget(stockDetailsLabel); // Add to the main vertical layout
-
+    // Move existing widgets/layouts into stockListLayout
+    stockListLayout->addLayout(addStockLayout); // The line edit and add button
+    stockListLayout->addWidget(stockListWidget);
+    stockListLayout->addWidget(stockDetailsLabel);
+    mainTabWidget->addTab(stockListTab, "Tracked Stocks"); // Add the list tab
     // --- Signal-Slot Connections ---
 
     // Connect the 'clicked' signal of the addStockButton to our 'onAddStockButtonClicked' slot.
@@ -195,11 +192,11 @@ void MainWindow::onSettingsButtonClicked() {
     // Here you would open a settings dialog or change a settings view.
 }
 
-// void MainWindow::onChartDataUpdated(const QList<QPair<qint64, double>> &historicalData) {
-//     qDebug() << "Chart data updated with" << historicalData.size() << "points.";
-//     // This slot would receive data from your model/fetcher and update the chart.
-//     // We will implement actual chart drawing using QtCharts in a later step.
-// }
+void MainWindow::onChartDataUpdated(const QList<QPair<qint64, double>> &historicalData) {
+    qDebug() << "Chart data updated with" << historicalData.size() << "points.";
+    // This slot would receive data from your model/fetcher and update the chart.
+    // We will implement actual chart drawing using QtCharts in a later step.
+}
 
 void MainWindow::onTabChanged(int index) {
     qDebug() << "Tab changed to index:" << index << " (" << mainTabWidget->tabText(index) << ")";
