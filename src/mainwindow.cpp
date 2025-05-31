@@ -105,7 +105,7 @@ MainWindow::MainWindow(QWidget *parent):
   connect(dataFetcher, &StockDataFetcher::invalidStockDataFetched, this, &MainWindow::onInvalidStockDataFetched);
   // Initial call to update the list display (it will be empty initially)
   updateStockListDisplay();
-  dataFetcher->setAPIKey();
+  //   dataFetcher->setAPIKey();
 }
 
 // Destructor implementation (empty as Qt's parent-child ownership handles deletion)

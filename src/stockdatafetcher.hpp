@@ -46,7 +46,7 @@ class StockDataFetcher : public QObject {
   private:
     QNetworkAccessManager *manager;  // The network manager instance
     QString                api_key;
-    bool                   validateAPIKey();
+    bool                   key_validated;
     // You could potentially store pending requests if you need to track them.
 };
 

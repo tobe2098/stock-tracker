@@ -11,8 +11,8 @@ const QList<QString>  api_paths { QStringLiteral("/../../api.txt"), QStringLiter
 
 // Constructor
 StockDataFetcher::StockDataFetcher(QObject *parent):
-    QObject(parent), manager(new QNetworkAccessManager(this))  // 'this' sets StockDataFetcher as parent, handles deletion
-{
+    QObject(parent), manager(new QNetworkAccessManager(this)),  // 'this' sets StockDataFetcher as parent, handles deletion
+    key_validated(false) {
   // Connect the finished signal of the manager to our slot
   connect(manager, &QNetworkAccessManager::finished, this, &StockDataFetcher::onNetworkReplyFinished);
 }
@@ -37,58 +37,20 @@ void StockDataFetcher::setAPIKey() {
     if (key.isEmpty()) {
       continue;
     }
-    // Now we validate the key
     api_key = key;
-    if (validateAPIKey()) {
-      qDebug() << "API Key set.";
-      return;
-    }
+    return;
   }
-  qDebug() << "Failed to set API Key.";
-  emit fetchError("AAPL", "Failed to validate API key");
-}
-bool StockDataFetcher::validateAPIKey() {
-  // This function will perform a synchronous HTTP GET request
-  QNetworkAccessManager manager;  // Manager created on the stack (local to this function)
-  QNetworkRequest       request(QUrl(QString("https://finnhub.io/api/v1/quote?symbol=AAPL&token=%1").arg(api_key)));
-  QNetworkReply        *reply = manager.get(request);
-  qDebug() << "Attempting to validate API key with symbol:" << VALIDATION_SYMBOL;
-
-  // Create a local event loop
-  QEventLoop loop;
-
-  // Connect the reply's finished signal to the event loop's quit slot
-  QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-
-  // Start the event loop and block until the reply finishes
-  // You might want to add a timeout here with a QTimer connected to loop.quit()
-  loop.exec();
-  bool       success { false };
-  QByteArray responseData;
-  if (reply->error() == QNetworkReply::NoError) {
-    responseData          = reply->readAll();
-    QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
-    if (jsonDoc.isObject()) {
-      QJsonObject jsonObject   = jsonDoc.object();
-      double      currentPrice = jsonObject["c"].toDouble();
-      qDebug() << "AAPL Current Price (Synchronous):" << currentPrice;
-      success = true;
-    } else {
-      qDebug() << "Invalid JSON response (Synchronous).";
-    }
-  } else {
-    qWarning() << "API Key validation failed:" << reply->errorString();
-  }
-  reply->deleteLater();  // Clean up the reply object
-  return success;
+  //   emit fetchError("AAPL", "Failed to validate API key");
 }
 StockDataFetcher::~StockDataFetcher() {
   qDebug() << "StockDataFetcher destroyed.";
   // manager is deleted automatically because it has 'this' as parent.
 }
-
 // Slot to initiate a data fetch
 void StockDataFetcher::fetchStockData(const QString &symbol) {
+  if (!key_validated) {
+    setAPIKey();
+  }
   if (symbol.isEmpty()) {
     emit fetchError(symbol, "Stock symbol cannot be empty.");
     return;
@@ -108,6 +70,7 @@ void StockDataFetcher::fetchStockData(const QString &symbol) {
 
 // Slot to handle the network reply when it's finished
 void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
+  bool      key_val_pending { !key_validated };
   QUrlQuery query(reply->url());
   QString   symbol = query.queryItemValue("symbol");
 
@@ -118,7 +81,9 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
   } else {
     QByteArray responseData = reply->readAll();
     qDebug() << "Received response for" << symbol << ":" << responseData.data();
-
+    if (key_val_pending) {
+      key_validated = true;
+    }
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
     QJsonObject   jsonObject;
     if (jsonDoc.isObject()) {
