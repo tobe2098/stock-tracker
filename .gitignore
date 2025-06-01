@@ -42,3 +42,5 @@ CMakeCache.txt
 /stock-tracker_autogen
 /build
 api.txt
+api_quote.txt
+api_historical.txt

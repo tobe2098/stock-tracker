@@ -1,8 +1,16 @@
 // src/mainwindow.cpp
 
 #include "mainwindow.hpp"  // Include our own header
-#include <QDebug>          // For debugging output (like console.log in JS)
-#include <QMessageBox>     // For simple pop-up messages (instead of alert())
+#include <QDate>           // For QDate operations
+#include <QDateTime>
+#include <QDebug>       // For debugging output (like console.log in JS)
+#include <QMessageBox>  // For simple pop-up messages (instead of alert())
+// Qt Charts specific includes
+#include <QtCharts/QChart>
+#include <QtCharts/QChartView>
+#include <QtCharts/QDateTimeAxis>  // For date axis
+#include <QtCharts/QLineSeries>
+#include <QtCharts/QValueAxis>  // For value axis
 
 // Constructor implementation
 MainWindow::MainWindow(QWidget *parent):
@@ -39,13 +47,6 @@ MainWindow::MainWindow(QWidget *parent):
   stockListTab                 = new QWidget(this);
   QVBoxLayout *stockListLayout = new QVBoxLayout(stockListTab);
 
-  // Create a container widget for the chart view
-  chartTab                 = new QWidget(this);
-  QVBoxLayout *chartLayout = new QVBoxLayout(chartTab);
-  stockChartView           = new QChartView(this);  // Placeholder for now, QtCharts setup is next.
-  chartLayout->addWidget(stockChartView);
-  mainTabWidget->addTab(chartTab, "Stock Chart");  // Add the chart tab
-
   // For now, let's just add a placeholder for a heatmap tab.
   heatmapTab = new QWidget(this);
   mainTabWidget->addTab(heatmapTab, "Heatmap");
@@ -79,6 +80,14 @@ MainWindow::MainWindow(QWidget *parent):
   // For simplicity, let's put it below the tabs for now.
   settingsButton = new QPushButton("Settings", this);
   mainLayout->addWidget(settingsButton);
+
+  // --- Stock Chart Tab Setup ---
+  chartTab                 = new QWidget(this);
+  QVBoxLayout *chartLayout = new QVBoxLayout(chartTab);
+  stockChartView           = new QChartView(this);        // Initialize QChartView
+  stockChartView->setRenderHint(QPainter::Antialiasing);  // For smoother rendering
+  chartLayout->addWidget(stockChartView);
+  mainTabWidget->addTab(chartTab, "Stock Chart");
   // --- Data Fetcher Setup ---
   dataFetcher = new StockDataFetcher(this);  // 'this' sets MainWindow as parent
 
@@ -103,6 +112,7 @@ MainWindow::MainWindow(QWidget *parent):
   connect(dataFetcher, &StockDataFetcher::stockDataFetched, this, &MainWindow::onStockDataFetched);
   connect(dataFetcher, &StockDataFetcher::fetchError, this, &MainWindow::onStockDataFetchError);
   connect(dataFetcher, &StockDataFetcher::invalidStockDataFetched, this, &MainWindow::onInvalidStockDataFetched);
+  connect(dataFetcher, &StockDataFetcher::historicalDataFetched, this, &MainWindow::onHistoricalDataFetched);
   // Initial call to update the list display (it will be empty initially)
   updateStockListDisplay();
   //   dataFetcher->setAPIKey();
@@ -120,16 +130,9 @@ void MainWindow::onAddStockButtonClicked() {
     QMessageBox::warning(this, "Input Error", "Please enter a stock symbol.");
     return;
   }
-
-  // Check for duplicates
-  for (const Stock &s : trackedStocks) {
-    if (s.getSymbol() == symbol) {
-      QMessageBox::information(this, "Stock Exists", QString("Stock '%1' is already being tracked.").arg(symbol));
-      stockSymbolLineEdit->clear();
-      return;
-    }
+  if (findStockBySymbol(symbol) != nullptr) {
+    return;
   }
-
   // Instead of creating a dummy stock, request data from the fetcher
   dataFetcher->fetchStockData(symbol);
 
@@ -145,6 +148,7 @@ void MainWindow::onStockListItemClicked(QListWidgetItem *item) {
   Stock *clicked_stock { findStockBySymbol(symbol) };
   // Find the actual Stock object in our trackedStocks list (Model)
   displayStockDetails(*clicked_stock);  // Display its details in the QLabel (View)
+  dataFetcher->fetchHistoricalData(symbol, 30);
 }
 
 // Helper method to update the QListWidget display
@@ -210,7 +214,8 @@ void MainWindow::onStockDataFetched(const Stock &stock) {
   if (existingStock) {
     // For now, if fetched data replaces existing, update it.
     // In a real app, you'd manage updates more sophisticatedly.
-    *existingStock = stock;  // Update existing stock data
+    existingStock->setCurrentPrice(stock.getCurrentPrice());
+    existingStock->setPriceChange(stock.getPriceChange());
     qDebug() << "Updated existing stock:" << stock.getSymbol();
   } else {
     trackedStocks.append(stock);  // Add new stock to our list
@@ -220,7 +225,18 @@ void MainWindow::onStockDataFetched(const Stock &stock) {
   updateStockListDisplay();    // Refresh the list widget
   displayStockDetails(stock);  // Display details of the newly fetched/updated stock
 }
-
+// New slot for historical data fetched
+void MainWindow::onHistoricalDataFetched(const QString &symbol, const QMap<QDateTime, double> &historicalData) {
+  qDebug() << "Historical data fetched for:" << symbol << " (" << historicalData.size() << " points)";
+  Stock *stock = findStockBySymbol(symbol);
+  if (stock) {
+    stock->setHistoricalPrices(historicalData);  // Set historical prices for the stock
+    updateChart(*stock);                         // Update the chart with this stock's data
+    mainTabWidget->setCurrentIndex(1);           // Switch to the chart tab
+  } else {
+    qWarning() << "Received historical data for unknown stock:" << symbol;
+  }
+}
 // New Slot: Handles errors during stock data fetch
 void MainWindow::onStockDataFetchError(const QString &symbol, const QString &errorString) {
   qWarning() << "Failed to fetch data for" << symbol << ":" << errorString;
@@ -239,4 +255,74 @@ Stock *MainWindow::findStockBySymbol(const QString &symbol) {
     }
   }
   return nullptr;  // Not found
+}
+
+// New helper method to draw/update the chart
+void MainWindow::updateChart(const Stock &stock) {
+  // Clear existing chart series if any
+  QChart *chart = stockChartView->chart();
+  if (!chart) {
+    chart = new QChart();
+    stockChartView->setChart(chart);
+  }
+  chart->removeAllSeries();  // Clear any previous series
+
+  // Create a line series
+  QLineSeries *series = new QLineSeries();
+  series->setName(stock.getSymbol());  // Name the series
+
+  // Add data points to the series
+  // QMap is sorted by key (QDate), so iterating gives chronological order
+  for (auto it = stock.getHistoricalPrices().constBegin(); it != stock.getHistoricalPrices().constEnd(); ++it) {
+    // Convert QDate to QDateTime and then to milliseconds since epoch for QPointF
+    QDateTime dateTime = it.key();
+    series->append(dateTime.toMSecsSinceEpoch(), it.value());
+  }
+
+  // Add series to chart
+  chart->addSeries(series);
+
+  // --- Configure Axes ---
+  // Remove default axes
+  chart->createDefaultAxes();
+
+  // Create custom X-axis for Date/Time
+  QDateTimeAxis *axisX = new QDateTimeAxis();
+  axisX->setFormat("MMM dd");  // Format for dates
+  axisX->setTitleText("Date");
+  chart->setAxisX(axisX, series);  // Attach axis to series
+
+  // Create custom Y-axis for Value (Price)
+  QValueAxis *axisY = new QValueAxis();
+  axisY->setTitleText("Price ($)");
+  chart->setAxisY(axisY, series);  // Attach axis to series
+
+  // Adjust ranges automatically based on data
+  chart->axisX()->setRange((stock.getHistoricalPrices().firstKey()), (stock.getHistoricalPrices().lastKey()));
+  // Find min/max price for Y-axis range
+  double minPrice = 0, maxPrice = 0;
+  if (!stock.getHistoricalPrices().isEmpty()) {
+    minPrice = stock.getHistoricalPrices().first();
+    maxPrice = stock.getHistoricalPrices().first();
+    for (double price : stock.getHistoricalPrices().values()) {
+      if (price < minPrice) {
+        minPrice = price;
+      }
+      if (price > maxPrice) {
+        maxPrice = price;
+      }
+    }
+  }
+  axisY->setRange(minPrice * 0.95, maxPrice * 1.05);  // Add a small buffer
+
+  chart->setTitle(QString("Historical Price for %1").arg(stock.getSymbol()));
+  chart->legend()->setVisible(true);
+  chart->legend()->setAlignment(Qt::AlignBottom);
+
+  // Enable zooming and panning
+  stockChartView->setRubberBand(QChartView::RectangleRubberBand);
+  stockChartView->setDragMode(QGraphicsView::ScrollHandDrag);  // Hand drag for panning
+
+  // Re-draw chart (though usually not strictly necessary after setting series and axes)
+  stockChartView->chart()->setTheme(QChart::ChartThemeLight);  // Optional: apply a theme
 }

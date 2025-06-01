@@ -18,11 +18,17 @@
 #include <QRandomGenerator>
 #include <QVBoxLayout>  // Vertical Box Layout
 #include <QtGlobal>
-
+// Qt Charts specific includes
+#include <QtCharts/QChart>
+#include <QtCharts/QChartView>
+#include <QtCharts/QDateTimeAxis>  // For date axis
+#include <QtCharts/QLineSeries>
+#include <QtCharts/QValueAxis>  // For value axis
 // Include our custom Stock class (Model)
 #include "stock.hpp"
 #include "stockdatafetcher.hpp"
 // Define our MainWindow class, inheriting from QMainWindow
+// Important: This macro brings QtCharts namespace into scope
 class MainWindow : public QMainWindow {
     // MANDATORY: This macro enables Qt's meta-object system features
     // like signals, slots, properties, and dynamic introspection.
@@ -54,6 +60,7 @@ class MainWindow : public QMainWindow {
 
     // New slots to receive data from StockDataFetcher
     void onStockDataFetched(const Stock &stock);
+    void onHistoricalDataFetched(const QString &symbol, const QMap<QDateTime, double> &historicalData);  // New slot
     void onInvalidStockDataFetched(const QString &error);
     void onStockDataFetchError(const QString &symbol, const QString &errorString);
 
@@ -85,6 +92,7 @@ class MainWindow : public QMainWindow {
     // These are regular private member functions.
     void updateStockListDisplay();
     void displayStockDetails(const Stock &stock);
+    void updateChart(const Stock &stock);  // New private helper to draw/update chart
 
     Stock *findStockBySymbol(const QString &symbol);
 };
