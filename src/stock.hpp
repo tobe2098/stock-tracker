@@ -6,47 +6,50 @@
 #include <QString>
 #include "global.hpp"
 
-struct HistoricalData {
-    time_record_t timestamp {};
-    price_t       open {};
-    price_t       high {};
-    price_t       low {};
-    price_t       close {};
-    HistoricalData(time_record_t timestamp, price_t open, price_t high, price_t low, price_t close):
-        timestamp(timestamp), open(open), high(high), low(low), close(close) { }
+struct HistoricalDataRecord {
+    price_t open {};
+    price_t high {};
+    price_t low {};
+    price_t close {};
+    HistoricalDataRecord(price_t open, price_t high, price_t low, price_t close): open(open), high(high), low(low), close(close) { }
 };
 
 class Stock {
-    QString        symbol;
-    QString        name;
-    price_t        currentPrice;
-    price_t        priceChange;
-    percentage_t   priceChangePercent;
-    volume_t       volume;
-    time_record_t  lastUpdatedTimestamp;
-    HistoricalData currentDayStats;
+    QString              symbol;
+    QString              name;
+    price_t              currentPrice;
+    price_t              priceChange;
+    time_record_t        lastUpdatedQuote;
+    time_record_t        lastUpdatedHistorical;
+    HistoricalDataRecord dayStats;
     // QList<HistoricalData> candleData;????
-    QMap<QDateTime, price_t> historicalPrices;
+    QMap<time_record_t, price_t> historicalPrices;
 
   public:
-    const QString&                 getSymbol() const { return symbol; }
-    const QString&                 getName() const { return name; }
-    price_t                        getCurrentPrice() const { return currentPrice; }
-    price_t                        getPriceChange() const { return priceChange; }
-    price_t                        getDayHigh() const { return currentDayStats.high; }
-    price_t                        getDayLow() const { return currentDayStats.low; }
-    price_t                        getDayOpen() const { return currentDayStats.open; }
-    price_t                        getDayClose() const { return currentDayStats.close; }
-    time_record_t                  getLastTimestamp() const { return currentDayStats.timestamp; }
-    const QMap<QDateTime, double>& getHistoricalPrices() const { return historicalPrices; }  // New getter
+    const QString&                     getSymbol() const { return symbol; }
+    const QString&                     getName() const { return name; }
+    price_t                            getCurrentPrice() const { return currentPrice; }
+    price_t                            getPriceChange() const { return priceChange; }
+    price_t                            getDayHigh() const { return dayStats.high; }
+    price_t                            getDayLow() const { return dayStats.low; }
+    price_t                            getDayOpen() const { return dayStats.open; }
+    price_t                            getDayClose() const { return dayStats.close; }
+    const QMap<time_record_t, double>& getHistoricalPrices() const { return historicalPrices; }  // New getter
+    time_record_t                      getLastQuoteFetchTime() const { return lastUpdatedQuote; }
+    time_record_t                      getLastHistoricalFetchTime() const { return lastUpdatedHistorical; }
+    HistoricalDataRecord               getDayStats() const { return dayStats; }
 
     void setCurrentPrice(price_t price) { currentPrice = price; }
     void setPriceChange(price_t price_change) { priceChange = price_change; }
-    void setHistoricalPrices(const QMap<QDateTime, double>& prices) { historicalPrices = prices; }  // New setter
-    Stock(QString symbol, QString symbol_name, price_t current_price, price_t price_change, percentage_t percent_change, price_t day_high,
-          price_t day_low, price_t day_open, price_t prev_close, time_record_t time):
-        symbol(symbol), name(symbol_name), currentPrice(current_price), priceChange(price_change), priceChangePercent(percent_change),
-        currentDayStats({ time, day_open, day_high, day_low, prev_close }), historicalPrices() { }
+    void setHistoricalPrices(const QMap<time_record_t, double>& prices) { historicalPrices = prices; }  // New setter
+    void setLastQuoteFetchTime(time_record_t time) { lastUpdatedQuote = time; }
+    void setLastHistoricalFetchTime(time_record_t time) { lastUpdatedHistorical = time; }
+    void setDayStats(HistoricalDataRecord record) { dayStats = record; }
+    Stock(QString symbol, QString symbol_name, price_t current_price, price_t price_change, price_t day_high, price_t day_low,
+          price_t day_open, price_t prev_close, time_record_t time_quote, time_record_t time_historical = 0):
+        symbol(symbol), name(symbol_name), currentPrice(current_price), priceChange(price_change), lastUpdatedQuote(time_quote),
+        lastUpdatedHistorical(time_historical), dayStats({ day_open, day_high, day_low, prev_close }), historicalPrices() { }
+    Stock(QString symbol): symbol(symbol), dayStats({ 0.0, 0.0, 0.0, 0.0 }) { }
 };
 
 // SQLite database for later

@@ -25,6 +25,7 @@
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QValueAxis>  // For value axis
 // Include our custom Stock class (Model)
+#include "datamanager.hpp"
 #include "stock.hpp"
 #include "stockdatafetcher.hpp"
 // Define our MainWindow class, inheriting from QMainWindow
@@ -42,6 +43,8 @@ class MainWindow : public QMainWindow {
     // (Though Qt's parent-child system often handles widget deletion automatically)
     ~MainWindow();
 
+  protected:
+    void closeEvent(QCloseEvent *event) override;
   private slots:
     // Slots are functions that can be connected to signals.
     // They are just regular C++ functions, but declared here to be visible to MOC.
@@ -60,7 +63,7 @@ class MainWindow : public QMainWindow {
 
     // New slots to receive data from StockDataFetcher
     void onStockDataFetched(const Stock &stock);
-    void onHistoricalDataFetched(const QString &symbol, const QMap<QDateTime, double> &historicalData);  // New slot
+    void onHistoricalDataFetched(const QString &symbol, const QMap<time_record_t, double> &historicalData);  // New slot
     void onInvalidStockDataFetched(const QString &error);
     void onStockDataFetchError(const QString &symbol, const QString &errorString);
 
@@ -84,10 +87,15 @@ class MainWindow : public QMainWindow {
 
     // Our new data fetcher instance
     StockDataFetcher *dataFetcher;
+    // Database manager
+    DatabaseManager *dbManager;
     // This QList will hold our Stock objects. It represents the "data" part
     // of our Model for now, specifically the collection of tracked stocks.
     QList<Stock> trackedStocks;
 
+    const QString DATABASE_FILE_PATH             = "stocks.db";   // SQLite database file name
+    const int     QUOTE_CACHE_LIFETIME_SECS      = 5 * 60;        // 5 minutes cache for current quotes
+    const int     HISTORICAL_CACHE_LIFETIME_SECS = 24 * 60 * 60;  // 24 hours cache for historical data
     // Helper methods for managing the UI and data display.
     // These are regular private member functions.
     void updateStockListDisplay();

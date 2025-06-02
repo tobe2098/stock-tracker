@@ -226,7 +226,7 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
         if (!jsonObject["d"].isNull()) {
           Stock fetchedStock(symbol, symbol + " Co.", jsonObject["c"].toDouble(), jsonObject["d"].toDouble(), jsonObject["dp"].toDouble(),
                              jsonObject["h"].toDouble(), jsonObject["l"].toDouble(), jsonObject["o"].toDouble(),
-                             jsonObject["pc"].toDouble(), jsonObject["t"].toInteger());
+                             jsonObject["t"].toInteger());
           emit  stockDataFetched(fetchedStock);  // Emit signal with the new Stock object
         } else {
           qDebug() << "Non-existent stock.";
@@ -240,14 +240,14 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
       keyValidatedHistorical = true;
       // --- SIMULATED JSON PARSING FOR HISTORICAL DATA ---
       // In a real app, parse the actual JSON response for historical data
-      QMap<QDateTime, double> historicalData;
-      QRandomGenerator64      gen(QDateTime::currentMSecsSinceEpoch());
-      QDateTime               today     = QDateTime::currentDateTime();
-      double                  lastPrice = 200.0 + (gen() % 1000) / 10.0;  // Starting price for historical simulation
+      QMap<time_record_t, double> historicalData;
+      QRandomGenerator64          gen(QDateTime::currentMSecsSinceEpoch());
+      time_record_t               now       = QDateTime::currentSecsSinceEpoch();
+      double                      lastPrice = 200.0 + (gen() % 1000) / 10.0;  // Starting price for historical simulation
 
       for (int i = 0; i < 30; ++i) {  // Simulate last 30 days
-        QDateTime date   = today.addDays(-i);
-        double    change = (gen() % 40 - 20) / 10.0;  // Random change between -2 and +2
+        time_record_t date   = now - i * 3600 * 24;
+        double        change = (gen() % 40 - 20) / 10.0;  // Random change between -2 and +2
         lastPrice += change;
         if (lastPrice < 1.0) {
           lastPrice = 1.0;  // Prevent price going too low

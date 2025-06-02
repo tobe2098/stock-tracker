@@ -1,8 +1,8 @@
 // src/mainwindow.cpp
 
 #include "mainwindow.hpp"  // Include our own header
-#include <QDate>           // For QDate operations
-#include <QDateTime>
+// #include <QDate>           // For QDate operations
+// #include <QDateTime>
 #include <QDebug>       // For debugging output (like console.log in JS)
 #include <QMessageBox>  // For simple pop-up messages (instead of alert())
 // Qt Charts specific includes
@@ -12,7 +12,9 @@
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QValueAxis>  // For value axis
 
+#include <QCoreApplication>  // Needed for QCoreApplication::applicationDirPath()
 // Constructor implementation
+static int tab_cnt = 0, stock_tab_id = 0, heatmap_tab_id = 0, chart_tab_id = 0;
 MainWindow::MainWindow(QWidget *parent):
     QMainWindow(parent)  // Call the base class constructor
 {
@@ -50,7 +52,7 @@ MainWindow::MainWindow(QWidget *parent):
   // For now, let's just add a placeholder for a heatmap tab.
   heatmapTab = new QWidget(this);
   mainTabWidget->addTab(heatmapTab, "Heatmap");
-
+  heatmap_tab_id = tab_cnt++;
   // Instantiate QLineEdit for stock symbol input
   stockSymbolLineEdit = new QLineEdit(this);  // 'this' (MainWindow) is the parent
   stockSymbolLineEdit->setPlaceholderText("Enter stock symbol (e.g., AAPL)");
@@ -75,6 +77,7 @@ MainWindow::MainWindow(QWidget *parent):
   stockListLayout->addWidget(stockListWidget);
   stockListLayout->addWidget(stockDetailsLabel);
   mainTabWidget->addTab(stockListTab, "Tracked Stocks");  // Add the list tab
+  stock_tab_id = tab_cnt++;
 
   // Add the settings button at the bottom of the main layout, or in a toolbar.
   // For simplicity, let's put it below the tabs for now.
@@ -88,9 +91,16 @@ MainWindow::MainWindow(QWidget *parent):
   stockChartView->setRenderHint(QPainter::Antialiasing);  // For smoother rendering
   chartLayout->addWidget(stockChartView);
   mainTabWidget->addTab(chartTab, "Stock Chart");
+  chart_tab_id = tab_cnt++;
   // --- Data Fetcher Setup ---
   dataFetcher = new StockDataFetcher(this);  // 'this' sets MainWindow as parent
-
+                                             // --- Database Manager Setup ---
+  // Use QCoreApplication::applicationDirPath() for the database file location
+  dbManager = new DatabaseManager(QCoreApplication::applicationDirPath() + "/" + DATABASE_FILE_PATH, this);
+  if (!dbManager->openDatabase()) {
+    QMessageBox::critical(this, "Database Error", "Failed to open or create database. Application may not function correctly.");
+    // Consider handling this more gracefully, e.g., disabling features
+  }
   // --- Signal-Slot Connections ---
   // Connect the 'clicked' signal of the addStockButton to our 'onAddStockButtonClicked' slot.
   // When the button is clicked, our slot function will be executed.
@@ -114,6 +124,7 @@ MainWindow::MainWindow(QWidget *parent):
   connect(dataFetcher, &StockDataFetcher::invalidStockDataFetched, this, &MainWindow::onInvalidStockDataFetched);
   connect(dataFetcher, &StockDataFetcher::historicalDataFetched, this, &MainWindow::onHistoricalDataFetched);
   // Initial call to update the list display (it will be empty initially)
+  trackedStocks = dbManager->loadAllStocks();
   updateStockListDisplay();
   //   dataFetcher->setAPIKey();
 }
@@ -122,7 +133,14 @@ MainWindow::MainWindow(QWidget *parent):
 MainWindow::~MainWindow() {
   qDebug() << "MainWindow destroyed.";
 }
-
+// Override for saving on application exit (now saving to DB)
+void MainWindow::closeEvent(QCloseEvent *event) {
+  qDebug() << "Application closing. Database connection will be closed automatically.";
+  // All relevant data should have been saved to DB by addOrUpdateStock.
+  // If you had any unsaved changes that are NOT part of the fetcher/db interaction,
+  // you would save them here. For now, we just accept.
+  event->accept();
+}
 // Slot implementation for adding a stock
 void MainWindow::onAddStockButtonClicked() {
   QString symbol = stockSymbolLineEdit->text().trimmed().toUpper();
@@ -130,9 +148,24 @@ void MainWindow::onAddStockButtonClicked() {
     QMessageBox::warning(this, "Input Error", "Please enter a stock symbol.");
     return;
   }
-  if (findStockBySymbol(symbol) != nullptr) {
-    return;
+
+  Stock *existingStockPtr = findStockBySymbol(symbol);  // Check in-memory list first
+
+  if (existingStockPtr) {
+    // Stock is already in memory
+    time_record_t now = QDateTime::currentSecsSinceEpoch();
+    if (existingStockPtr->getLastQuoteFetchTime() != 0 && (now - existingStockPtr->getLastQuoteFetchTime()) < QUOTE_CACHE_LIFETIME_SECS) {
+      QMessageBox::information(this, "Data is Fresh", QString("Current quote for '%1' is recent. Not fetching again.").arg(symbol));
+      displayStockDetails(*existingStockPtr);
+      stockSymbolLineEdit->clear();
+      return;
+    }
+    QMessageBox::information(this, "Fetching Data", QString("Current quote for '%1' is stale. Fetching...").arg(symbol));
+  } else {
+    // Stock not in memory, fetch it for the first time
+    QMessageBox::information(this, "New Stock", QString("Adding and fetching data for new stock '%1'...").arg(symbol));
   }
+
   // Instead of creating a dummy stock, request data from the fetcher
   dataFetcher->fetchStockData(symbol);
 
@@ -144,11 +177,22 @@ void MainWindow::onStockListItemClicked(QListWidgetItem *item) {
   // Extract the symbol from the clicked item's text.
   // We assume the format is "SYMBOL (Name) - Current Price: $X.XX"
   QString symbol = item->text().split(" ")[0];
+  Stock  *stock  = findStockBySymbol(symbol);  // Get stock from in-memory list
   qDebug() << "Selected stock:" << symbol;
-  Stock *clicked_stock { findStockBySymbol(symbol) };
-  // Find the actual Stock object in our trackedStocks list (Model)
-  displayStockDetails(*clicked_stock);  // Display its details in the QLabel (View)
-  dataFetcher->fetchHistoricalData(symbol, 30);
+  if (stock) {
+    displayStockDetails(*stock);
+
+    time_record_t now = QDateTime::currentSecsSinceEpoch();
+    if (stock->getLastHistoricalFetchTime() != 0 && now - stock->getLastHistoricalFetchTime() < HISTORICAL_CACHE_LIFETIME_SECS) {
+      qDebug() << "Historical data for" << symbol << "is recent. Using cached data.";
+      updateChart(*stock);  // Use existing historical data
+      mainTabWidget->setCurrentIndex(chart_tab_id);
+      return;
+    }
+
+    qDebug() << "Historical data for" << symbol << "is stale. Fetching...";
+    dataFetcher->fetchHistoricalData(symbol, 30);
+  }
 }
 
 // Helper method to update the QListWidget display
@@ -208,7 +252,8 @@ void MainWindow::onTabChanged(int index) {
 // New Slot: Handles successful stock data fetch
 void MainWindow::onStockDataFetched(const Stock &stock) {
   qDebug() << "Stock data fetched successfully for:" << stock.getSymbol();
-
+  Stock fetchedStockCopy = stock;                                              // Create a mutable copy
+  fetchedStockCopy.setLastQuoteFetchTime(QDateTime::currentSecsSinceEpoch());  // Set current fetch time
   // Check if the stock already exists (e.g., if we requested a refresh later)
   Stock *existingStock = findStockBySymbol(stock.getSymbol());
   if (existingStock) {
@@ -216,23 +261,32 @@ void MainWindow::onStockDataFetched(const Stock &stock) {
     // In a real app, you'd manage updates more sophisticatedly.
     existingStock->setCurrentPrice(stock.getCurrentPrice());
     existingStock->setPriceChange(stock.getPriceChange());
+    existingStock->setLastQuoteFetchTime(fetchedStockCopy.getLastQuoteFetchTime());
+    existingStock->setDayStats(fetchedStockCopy.getDayStats());
     qDebug() << "Updated existing stock:" << stock.getSymbol();
   } else {
-    trackedStocks.append(stock);  // Add new stock to our list
+    trackedStocks.append(fetchedStockCopy);  // Add new stock to our list
     qDebug() << "Added new stock:" << stock.getSymbol();
   }
+  // Save/update stock to database (important!)
+  dbManager->addOrUpdateStock(fetchedStockCopy);
 
-  updateStockListDisplay();    // Refresh the list widget
-  displayStockDetails(stock);  // Display details of the newly fetched/updated stock
+  updateStockListDisplay();               // Refresh the list widget
+  displayStockDetails(fetchedStockCopy);  // Display details of the newly fetched/updated stock
 }
 // New slot for historical data fetched
-void MainWindow::onHistoricalDataFetched(const QString &symbol, const QMap<QDateTime, double> &historicalData) {
+void MainWindow::onHistoricalDataFetched(const QString &symbol, const QMap<time_record_t, double> &historicalData) {
   qDebug() << "Historical data fetched for:" << symbol << " (" << historicalData.size() << " points)";
   Stock *stock = findStockBySymbol(symbol);
   if (stock) {
     stock->setHistoricalPrices(historicalData);  // Set historical prices for the stock
-    updateChart(*stock);                         // Update the chart with this stock's data
-    mainTabWidget->setCurrentIndex(1);           // Switch to the chart tab
+    stock->setLastHistoricalFetchTime(QDateTime::currentSecsSinceEpoch());
+    updateChart(*stock);                           // Update the chart with this stock's data
+    mainTabWidget->setCurrentIndex(chart_tab_id);  // Switch to the chart tab
+    // Update historical prices in database
+    dbManager->updateHistoricalPrices(symbol, historicalData);
+    // Also update the stock's last_historical_fetch_time in the main stocks table
+    dbManager->addOrUpdateStock(*stock);  // This will update the fetch time
   } else {
     qWarning() << "Received historical data for unknown stock:" << symbol;
   }
@@ -254,6 +308,10 @@ Stock *MainWindow::findStockBySymbol(const QString &symbol) {
       return &trackedStocks[i];  // Return pointer to the element in the list
     }
   }
+  // If not found in memory, try loading from database (useful for fresh start/missing data)
+  // IMPORTANT: This creates a copy. If you want to modify, you'd need to add to trackedStocks.
+  // For now, let's keep it simple: if not in `trackedStocks`, we assume it's new.
+  // A more complex solution might add it to `trackedStocks` if found in DB here.
   return nullptr;  // Not found
 }
 
@@ -275,8 +333,8 @@ void MainWindow::updateChart(const Stock &stock) {
   // QMap is sorted by key (QDate), so iterating gives chronological order
   for (auto it = stock.getHistoricalPrices().constBegin(); it != stock.getHistoricalPrices().constEnd(); ++it) {
     // Convert QDate to QDateTime and then to milliseconds since epoch for QPointF
-    QDateTime dateTime = it.key();
-    series->append(dateTime.toMSecsSinceEpoch(), it.value());
+    time_record_t dateTime = it.key();
+    series->append(dateTime * 1000, it.value());
   }
 
   // Add series to chart
@@ -288,17 +346,20 @@ void MainWindow::updateChart(const Stock &stock) {
 
   // Create custom X-axis for Date/Time
   QDateTimeAxis *axisX = new QDateTimeAxis();
-  axisX->setFormat("MMM dd");  // Format for dates
+  axisX->setFormat("MMM dd hh:mm");  // Format for dates
   axisX->setTitleText("Date");
-  chart->setAxisX(axisX, series);  // Attach axis to series
-
+  chart->addAxis(axisX, Qt::AlignBottom);  // or appropriate alignment
+  chart->addSeries(series);
+  series->attachAxis(axisX);
   // Create custom Y-axis for Value (Price)
   QValueAxis *axisY = new QValueAxis();
   axisY->setTitleText("Price ($)");
-  chart->setAxisY(axisY, series);  // Attach axis to series
+  chart->addAxis(axisY, Qt::AlignLeft);  // or appropriate alignment
+  series->attachAxis(axisY);
 
   // Adjust ranges automatically based on data
-  chart->axisX()->setRange((stock.getHistoricalPrices().firstKey()), (stock.getHistoricalPrices().lastKey()));
+  axisX->setRange(QDateTime::fromSecsSinceEpoch(stock.getHistoricalPrices().firstKey()),
+                  QDateTime::fromSecsSinceEpoch(stock.getHistoricalPrices().lastKey()));
   // Find min/max price for Y-axis range
   double minPrice = 0, maxPrice = 0;
   if (!stock.getHistoricalPrices().isEmpty()) {
@@ -320,7 +381,7 @@ void MainWindow::updateChart(const Stock &stock) {
   chart->legend()->setAlignment(Qt::AlignBottom);
 
   // Enable zooming and panning
-  stockChartView->setRubberBand(QChartView::RectangleRubberBand);
+  //   stockChartView->setRubberBand(QChartView::RectangleRubberBand);
   stockChartView->setDragMode(QGraphicsView::ScrollHandDrag);  // Hand drag for panning
 
   // Re-draw chart (though usually not strictly necessary after setting series and axes)
