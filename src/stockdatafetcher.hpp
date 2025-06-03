@@ -32,11 +32,11 @@ class StockDataFetcher : public QObject {
   public slots:
     // Slot to initiate fetching data for a given stock symbol
     void fetchStockData(const QString &symbol);
-    void fetchHistoricalData(const QString &symbol, int daysBack = 30);  // New slot for historical data
+    void fetchHistoricalData(const QString &symbol);  // New slot for historical data
   signals:
     // Signal emitted when stock data is successfully fetched
     void stockDataFetched(const Stock &stock);
-    void historicalDataFetched(const QString &symbol, const QMap<time_record_t, double> &historicalData);
+    void historicalDataFetched(const QString &symbol, const QMap<time_record_t, HistoricalDataRecord> &historicalData);
     void invalidStockDataFetched(const QString &error);
     // Signal emitted if there's an error during fetching
     void fetchError(const QString &symbol, const QString &errorString);
@@ -52,10 +52,10 @@ class StockDataFetcher : public QObject {
     QString                apiKeyQuote;
     QString                apiKeyHistorical;
 
-    QQueue<QString>             symbolQueue;             // Queue of symbols to fetch
-    QQueue<QPair<QString, int>> historicalQueue;         // New queue for historical requests (symbol, daysBack)
-    QTimer                     *symbolRequestTimer;      // Timer to control request rate
-    QTimer                     *historicalRequestTimer;  // Timer to control request rate
+    QQueue<QString> symbolQueue;             // Queue of symbols to fetch
+    QQueue<QString> historicalQueue;         // New queue for historical requests (symbol, daysBack)
+    QTimer         *symbolRequestTimer;      // Timer to control request rate
+    QTimer         *historicalRequestTimer;  // Timer to control request rate
 
     const quint64 SYMBOL_REQUEST_INTERVAL_MS { 1100 };      // Example: 1.1 seconds
     const quint64 HISTORICAL_REQUEST_INTERVAL_MS { 1100 };  // Example: 1.1 seconds

@@ -62,7 +62,11 @@ bool DatabaseManager::createTables() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             stock_symbol TEXT NOT NULL,
             timestamp BIGINT NOT NULL,
-            price REAL NOT NULL,
+            day_high REAL,
+            day_low REAL,
+            day_open REAL,
+            day_close REAL,
+            volume BIGINT,
             UNIQUE(stock_symbol, timestamp),
             FOREIGN KEY (stock_symbol) REFERENCES stocks(symbol) ON DELETE CASCADE
         )
@@ -195,7 +199,7 @@ bool DatabaseManager::deleteStock(const QString &symbol) {
 }
 
 // Updates/Inserts historical prices for a stock
-bool DatabaseManager::updateHistoricalPrices(const QString &symbol, const QMap<time_record_t, double> &historicalData) {
+bool DatabaseManager::updateHistoricalPrices(const QString &symbol, const QMap<time_record_t, HistoricalDataRecord> &historicalData) {
   QSqlQuery query(database);
   database.transaction();  // Start a transaction for bulk inserts
 
@@ -210,11 +214,17 @@ bool DatabaseManager::updateHistoricalPrices(const QString &symbol, const QMap<t
   }
 
   // Insert new historical data
-  query.prepare("INSERT INTO historical_prices (stock_symbol, timestamp, price) VALUES (:symbol, :timestamp, :price)");
+  query.prepare(
+    "INSERT INTO historical_prices (stock_symbol, timestamp, day_high, day_low, day_open, day_close, volume) VALUES(:symbol, :timestamp, "
+    ":day_high, :day_low, :day_open, :day_close, :volume)");
   for (auto it = historicalData.constBegin(); it != historicalData.constEnd(); ++it) {
     query.bindValue(":symbol", symbol);
     query.bindValue(":timestamp", it.key());
-    query.bindValue(":price", it.value());
+    query.bindValue(":day_high", it.value().high);
+    query.bindValue(":day_low", it.value().low);
+    query.bindValue(":day_open", it.value().open);
+    query.bindValue(":day_close", it.value().close);
+    query.bindValue(":volume", it.value().volume);
     if (!query.exec()) {
       database.rollback();
       qCritical() << "Error inserting historical price for" << symbol << "on" << QDateTime::fromSecsSinceEpoch(it.key()) << ":"
@@ -232,16 +242,18 @@ bool DatabaseManager::updateHistoricalPrices(const QString &symbol, const QMap<t
 }
 
 // Loads historical prices for a given stock
-QMap<time_record_t, double> DatabaseManager::loadHistoricalPrices(const QString &symbol) {
-  QMap<time_record_t, double> historicalData;
-  QSqlQuery                   query(database);
-  query.prepare("SELECT timestamp, price FROM historical_prices WHERE stock_symbol = :symbol ORDER BY timestamp ASC");
+QMap<time_record_t, HistoricalDataRecord> DatabaseManager::loadHistoricalPrices(const QString &symbol) {
+  QMap<time_record_t, HistoricalDataRecord> historicalData;
+  QSqlQuery                                 query(database);
+  query.prepare(
+    "SELECT timestamp, day_high, day_low, day_open, day_close, volume FROM historical_prices WHERE stock_symbol = :symbol ORDER BY "
+    "timestamp ASC");
   query.bindValue(":symbol", symbol);
   if (query.exec()) {
     while (query.next()) {
-      time_record_t date_time = query.value("timestamp").toLongLong();
-      double        price     = query.value("price").toDouble();
-      historicalData.insert(date_time, price);
+      historicalData.insert(query.value("timestamp").toLongLong(),
+                            { query.value("day_high").toDouble(), query.value("day_low").toDouble(), query.value("day_open").toDouble(),
+                              query.value("day_close").toDouble(), query.value("volume").toLongLong() });
     }
     qDebug() << "Loaded" << historicalData.size() << "historical prices for" << symbol;
   } else {

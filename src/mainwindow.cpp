@@ -185,13 +185,16 @@ void MainWindow::onStockListItemClicked(QListWidgetItem *item) {
     time_record_t now = QDateTime::currentSecsSinceEpoch();
     if (stock->getLastHistoricalFetchTime() != 0 && now - stock->getLastHistoricalFetchTime() < HISTORICAL_CACHE_LIFETIME_SECS) {
       qDebug() << "Historical data for" << symbol << "is recent. Using cached data.";
+      if (stock->getHistoricalPrices().size() == 0) {
+        stock->setHistoricalPrices(dbManager->loadHistoricalPrices(stock->getSymbol()));
+      }
       updateChart(*stock);  // Use existing historical data
       mainTabWidget->setCurrentIndex(chart_tab_id);
       return;
     }
 
     qDebug() << "Historical data for" << symbol << "is stale. Fetching...";
-    dataFetcher->fetchHistoricalData(symbol, 30);
+    dataFetcher->fetchHistoricalData(symbol);
   }
 }
 
@@ -216,8 +219,8 @@ void MainWindow::displayStockDetails(const Stock &stock) {
                       "<b>Name:</b> %2<br>"
                       "<b>Current Price:</b> $%3<br>"
                       "<b>Price Change:</b> $%4 (<span style='color:%6;'>%5%</span>)<br>"  // Added color for change
-                      "<b>Previous day close:</b> $%7, <b>Day open</b>: $%8, <b>Change:</b>(<span style='color:%13;'> %9%</span>)<br>"
-                      "<b>Day high:</b> $%10, <b>Day low:</b> $%11, <b>Change:</b> %12%"
+                      "<b>Previous day close:</b> $%7, <b>Day open</b>: $%8, <b>O/N change:</b>(<span style='color:%13;'> %9%</span>)<br>"
+                      "<b>Day high:</b> $%10, <b>Day low:</b> $%11, <b>Span:</b> %12%"
                       //   "<b>Time and date of record:</b> %13"
                       )
                       .arg(stock.getSymbol(), stock.getName(), QString::number(stock.getCurrentPrice(), 'f', 2),
@@ -275,7 +278,7 @@ void MainWindow::onStockDataFetched(const Stock &stock) {
   displayStockDetails(fetchedStockCopy);  // Display details of the newly fetched/updated stock
 }
 // New slot for historical data fetched
-void MainWindow::onHistoricalDataFetched(const QString &symbol, const QMap<time_record_t, double> &historicalData) {
+void MainWindow::onHistoricalDataFetched(const QString &symbol, const QMap<time_record_t, HistoricalDataRecord> &historicalData) {
   qDebug() << "Historical data fetched for:" << symbol << " (" << historicalData.size() << " points)";
   Stock *stock = findStockBySymbol(symbol);
   if (stock) {
@@ -324,7 +327,11 @@ void MainWindow::updateChart(const Stock &stock) {
     stockChartView->setChart(chart);
   }
   chart->removeAllSeries();  // Clear any previous series
-
+  // Remove all existing axes properly
+  QList<QAbstractAxis *> axes = chart->axes();
+  for (QAbstractAxis *axis : axes) {
+    chart->removeAxis(axis);
+  }
   // Create a line series
   QLineSeries *series = new QLineSeries();
   series->setName(stock.getSymbol());  // Name the series
@@ -333,23 +340,20 @@ void MainWindow::updateChart(const Stock &stock) {
   // QMap is sorted by key (QDate), so iterating gives chronological order
   for (auto it = stock.getHistoricalPrices().constBegin(); it != stock.getHistoricalPrices().constEnd(); ++it) {
     // Convert QDate to QDateTime and then to milliseconds since epoch for QPointF
-    time_record_t dateTime = it.key();
-    series->append(dateTime * 1000, it.value());
+    series->append(it.key() * 1000, it.value().close);
   }
 
   // Add series to chart
   chart->addSeries(series);
-
   // --- Configure Axes ---
   // Remove default axes
-  chart->createDefaultAxes();
+  // chart->createDefaultAxes();
 
   // Create custom X-axis for Date/Time
   QDateTimeAxis *axisX = new QDateTimeAxis();
   axisX->setFormat("MMM dd hh:mm");  // Format for dates
   axisX->setTitleText("Date");
   chart->addAxis(axisX, Qt::AlignBottom);  // or appropriate alignment
-  chart->addSeries(series);
   series->attachAxis(axisX);
   // Create custom Y-axis for Value (Price)
   QValueAxis *axisY = new QValueAxis();
@@ -363,14 +367,14 @@ void MainWindow::updateChart(const Stock &stock) {
   // Find min/max price for Y-axis range
   double minPrice = 0, maxPrice = 0;
   if (!stock.getHistoricalPrices().isEmpty()) {
-    minPrice = stock.getHistoricalPrices().first();
-    maxPrice = stock.getHistoricalPrices().first();
-    for (double price : stock.getHistoricalPrices().values()) {
-      if (price < minPrice) {
-        minPrice = price;
+    minPrice = stock.getHistoricalPrices().first().close;
+    maxPrice = stock.getHistoricalPrices().first().close;
+    for (HistoricalDataRecord &record : stock.getHistoricalPrices().values()) {
+      if (record.close < minPrice) {
+        minPrice = record.close;
       }
-      if (price > maxPrice) {
-        maxPrice = price;
+      if (record.close > maxPrice) {
+        maxPrice = record.close;
       }
     }
   }
@@ -382,7 +386,19 @@ void MainWindow::updateChart(const Stock &stock) {
 
   // Enable zooming and panning
   //   stockChartView->setRubberBand(QChartView::RectangleRubberBand);
-  stockChartView->setDragMode(QGraphicsView::ScrollHandDrag);  // Hand drag for panning
+  // Enable zooming and panning - REPLACE your current interaction code with this:
+  stockChartView->setRubberBand(QChartView::RectangleRubberBand);
+  stockChartView->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(stockChartView, &QChartView::customContextMenuRequested, this, [this]() { stockChartView->chart()->zoomReset(); });
+
+  // Enable mouse wheel zooming
+  // connect(stockChartView, &QChartView::wheelEvent, this, [this](QWheelEvent *event) {
+  //   if (event->angleDelta().y() > 0) {
+  //     stockChartView->chart()->zoomIn();
+  //   } else {
+  //     stockChartView->chart()->zoomOut();
+  //   }
+  // });
 
   // Re-draw chart (though usually not strictly necessary after setting series and axes)
   stockChartView->chart()->setTheme(QChart::ChartThemeLight);  // Optional: apply a theme

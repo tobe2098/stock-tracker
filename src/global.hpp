@@ -4,6 +4,6 @@
 using time_record_t = long long;
 using price_t       = double;
 using percentage_t  = double;
-using volume_t      = int;
+using volume_t      = long long;
 
 #endif

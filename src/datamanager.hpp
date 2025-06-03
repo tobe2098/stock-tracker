@@ -30,8 +30,8 @@ class DatabaseManager : public QObject {
     bool         deleteStock(const QString &symbol);
 
     // Operations for historical prices
-    bool                        updateHistoricalPrices(const QString &symbol, const QMap<time_record_t, double> &historicalData);
-    QMap<time_record_t, double> loadHistoricalPrices(const QString &symbol);
+    bool updateHistoricalPrices(const QString &symbol, const QMap<time_record_t, HistoricalDataRecord> &historicalData);
+    QMap<time_record_t, HistoricalDataRecord> loadHistoricalPrices(const QString &symbol);
 
   private:
     QSqlDatabase database;

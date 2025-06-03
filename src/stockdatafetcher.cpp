@@ -103,7 +103,7 @@ void StockDataFetcher::fetchStockData(const QString &symbol) {
     processNextRequestSymbol();
   }
 }
-void StockDataFetcher::fetchHistoricalData(const QString &symbol, int daysBack) {
+void StockDataFetcher::fetchHistoricalData(const QString &symbol) {
   if (!keyValidatedHistorical) {
     setAPIKeyHistorical();
   }
@@ -111,12 +111,11 @@ void StockDataFetcher::fetchHistoricalData(const QString &symbol, int daysBack) 
     emit fetchError(symbol, "Stock symbol cannot be empty.");
     return;
   }
-  QPair<QString, int> histRequest = qMakePair(symbol, daysBack);
-  if (historicalQueue.contains(histRequest)) {
+  if (historicalQueue.contains(symbol)) {
     qDebug() << "Symbol" << symbol << "already in queue.";
     return;  // Don't add duplicates to the queue if already pending
   }
-  historicalQueue.enqueue(histRequest);
+  historicalQueue.enqueue(symbol);
   qDebug() << "Enqueued symbol:" << symbol << ". Queue size:" << symbolQueue.size();
   // If not currently fetching, immediately try to process the next request
   // This allows the first request to go out without waiting for the timer,
@@ -165,18 +164,18 @@ void StockDataFetcher::processNextRequestHistorical() {
     return;
   }
 
-  QPair<QString, int> historicalToFetch = historicalQueue.dequeue();  // Get the next symbol from the queue
-  isFetchingHistorical                  = true;
+  QString symbol       = historicalQueue.dequeue();  // Get the next symbol from the queue
+  isFetchingHistorical = true;
 
   // Use a dummy URL for now. The actual data parsing will be mocked in onNetworkReplyFinished.
-  QUrl url(QString("https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=%1&apikey=%2")
-             .arg(historicalToFetch.first, apiKeyHistorical));
-  qDebug() << "Requesting data for:" << historicalToFetch << "from" << url.toString();
+  QUrl url(QString("https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=%1&apikey=%2&outputsize=full")
+             .arg(symbol, apiKeyHistorical));
+  qDebug() << "Requesting data for:" << symbol << "from" << url.toString();
   QNetworkRequest request(url);
   // You might add specific headers if your API requires them, e.g.:
   // request.setRawHeader("X-API-KEY", m_apiKey.toUtf8());
   request.setAttribute(RequestTypeAttributeId, QVariant::fromValue(RequestType::HistoricalRequest));
-  request.setAttribute(NoDaysHistoricRequest, QVariant::fromValue(historicalToFetch.second));
+  // request.setAttribute(NoDaysHistoricRequest, QVariant::fromValue(historicalToFetch.second));
 
   manager->get(request);  // Send the GET request
   historicalRequestTimer->start(HISTORICAL_REQUEST_INTERVAL_MS);
@@ -214,8 +213,9 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
   } else {
     // Success (HTTP Status 200 OK)
     QByteArray responseData = reply->readAll();
-    qDebug() << "Received response for" << symbol << ":" << responseData.data();
+    qDebug() << "Received response for" << symbol << ".";  // << responseData.data();
     if (requestType == QuoteRequest) {
+      qDebug() << responseData.data();
       keyValidatedQuote     = true;
       QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
       QJsonObject   jsonObject;
@@ -224,8 +224,8 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
         //    Stock(QString symbol, QString symbol_name, price_t current_price, price_t price_change, percentage_t percent_change, price_t
         //    day_high,price_t day_low, price_t day_open, price_t prev_close, time_record_t time)
         if (!jsonObject["d"].isNull()) {
-          Stock fetchedStock(symbol, symbol + " Co.", jsonObject["c"].toDouble(), jsonObject["d"].toDouble(), jsonObject["dp"].toDouble(),
-                             jsonObject["h"].toDouble(), jsonObject["l"].toDouble(), jsonObject["o"].toDouble(),
+          Stock fetchedStock(symbol, symbol + " Co.", jsonObject["c"].toDouble(), jsonObject["d"].toDouble(), jsonObject["h"].toDouble(),
+                             jsonObject["l"].toDouble(), jsonObject["o"].toDouble(), jsonObject["pc"].toDouble(),
                              jsonObject["t"].toInteger());
           emit  stockDataFetched(fetchedStock);  // Emit signal with the new Stock object
         } else {
@@ -240,21 +240,27 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
       keyValidatedHistorical = true;
       // --- SIMULATED JSON PARSING FOR HISTORICAL DATA ---
       // In a real app, parse the actual JSON response for historical data
-      QMap<time_record_t, double> historicalData;
-      QRandomGenerator64          gen(QDateTime::currentMSecsSinceEpoch());
-      time_record_t               now       = QDateTime::currentSecsSinceEpoch();
-      double                      lastPrice = 200.0 + (gen() % 1000) / 10.0;  // Starting price for historical simulation
-
-      for (int i = 0; i < 30; ++i) {  // Simulate last 30 days
-        time_record_t date   = now - i * 3600 * 24;
-        double        change = (gen() % 40 - 20) / 10.0;  // Random change between -2 and +2
-        lastPrice += change;
-        if (lastPrice < 1.0) {
-          lastPrice = 1.0;  // Prevent price going too low
+      QMap<time_record_t, HistoricalDataRecord> historicalData;
+      QJsonDocument                             jsonDoc = QJsonDocument::fromJson(responseData);
+      QJsonObject                               rootObj;
+      if (jsonDoc.isObject()) {
+        rootObj                   = jsonDoc.object();
+        QJsonObject timeSeriesObj = rootObj["Time Series (Daily)"].toObject();
+        // We assume the stock exists because it has to be in the list for it to be clicked for the request
+        for (auto it = timeSeriesObj.begin(); it != timeSeriesObj.end(); ++it) {
+          // qDebug() << it.value().toString();
+          QJsonObject   dayData           = it.value().toObject();
+          time_record_t secondsSinceEpoch = QDateTime::fromString(it.key(), "yyyy-MM-dd").toSecsSinceEpoch();
+          // Debug the actual data we're parsing
+          historicalData.insert(secondsSinceEpoch, { dayData["1. open"].toString().toDouble(), dayData["2. high"].toString().toDouble(),
+                                                     dayData["3. low"].toString().toDouble(), dayData["4. close"].toString().toDouble(),
+                                                     dayData["5. volume"].toString().toLongLong() });
         }
-        historicalData.insert(date, lastPrice);
+        emit historicalDataFetched(symbol, historicalData);
+      } else {
+        qDebug() << "Response is not a JSON.";
+        emit invalidStockDataFetched("Network response is not a valid JSON.");
       }
-      emit historicalDataFetched(symbol, historicalData);
     }
   }
 

@@ -63,7 +63,7 @@ class MainWindow : public QMainWindow {
 
     // New slots to receive data from StockDataFetcher
     void onStockDataFetched(const Stock &stock);
-    void onHistoricalDataFetched(const QString &symbol, const QMap<time_record_t, double> &historicalData);  // New slot
+    void onHistoricalDataFetched(const QString &symbol, const QMap<time_record_t, HistoricalDataRecord> &historicalData);  // New slot
     void onInvalidStockDataFetched(const QString &error);
     void onStockDataFetchError(const QString &symbol, const QString &errorString);
 
