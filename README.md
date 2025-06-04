@@ -9,11 +9,14 @@ A stock-tracker using Qt and C++
 - Cross button for stocks (deletes from memory but not from database?)
 - Delete button for stocks (deletes from memory and from database)
 
-- Load json from API query for history (try to make it a rich query, intra and interday)
+- Load json from API query for history (try to make it a rich query, intra and interday) DONE
 - Review annotations for what can be done (findstock and update without deleting)
 - Fetching notiffication only during fetching, not require click.
 - Ability to track your portfolio (introduce manually, stored).
 - Display API requests left. Recovered either from DB or by checking each stored stock (problem is if deleted). Store a queue of timestamps
 - Special button for the API request.
 - Change chart to be candles.
-- Improve X axis manipulation. Maybe a time scroller?
+- Load historic data of stocks on startup
+- Retrieving data from API request progress bar?
+
+- Improve X axis manipulation. Maybe a time scroller? Done

@@ -7,6 +7,7 @@
 #include <QMainWindow>
 // Include specific UI widgets we plan to use
 #include <QChartView>  // For displaying charts (from Qt Charts module)
+#include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -57,6 +58,7 @@ class MainWindow : public QMainWindow {
     // This slot will be called when an item in the QListWidget is clicked.
     // It takes a QListWidgetItem pointer as an argument, which is provided by the signal.
     void onStockListItemClicked(QListWidgetItem *item);
+    void onStockSelectionChanged(int index);
     void onSettingsButtonClicked();  // New slot for the settings button
     void onChartDataUpdated(const QList<QPair<qint64, double>> &historicalData);
     // You might also consider a slot for when a tab is changed, if needed
@@ -83,6 +85,8 @@ class MainWindow : public QMainWindow {
     QWidget    *heatmapTab;
 
     QChartView *stockChartView;
+    QComboBox  *m_stockSelector;
+    bool        m_hasPlaceholderChart;
 
     QPushButton *settingsButton;
 
@@ -102,6 +106,10 @@ class MainWindow : public QMainWindow {
     void updateStockListDisplay();
     void displayStockDetails(const Stock &stock);
     void updateChart(const Stock &stock);  // New private helper to draw/update chart
+
+    void setupPlaceholderChart();
+    void setupStockSelector();
+    // void createPlaceholderData();
 
     Stock *findStockBySymbol(const QString &symbol);
 };

@@ -85,13 +85,21 @@ MainWindow::MainWindow(QWidget *parent):
   mainLayout->addWidget(settingsButton);
 
   // --- Stock Chart Tab Setup ---
-  chartTab                 = new QWidget(this);
-  QVBoxLayout *chartLayout = new QVBoxLayout(chartTab);
-  stockChartView           = new AutoScaleChartView(this);  // Initialize QChartView
-  stockChartView->setRenderHint(QPainter::Antialiasing);    // For smoother rendering
+  chartTab                    = new QWidget(this);
+  QVBoxLayout *chartLayout    = new QVBoxLayout(chartTab);
+  stockChartView              = new AutoScaleChartView(this);  // Initialize QChartView
+  m_stockSelector             = new QComboBox();
+  QHBoxLayout *selectorLayout = new QHBoxLayout();
+  QLabel      *selectorLabel  = new QLabel("Stock:");
+  selectorLayout->addWidget(selectorLabel);
+  selectorLayout->addWidget(m_stockSelector);
+  selectorLayout->addStretch();
+  stockChartView->setRenderHint(QPainter::Antialiasing);  // For smoother rendering
+  chartLayout->addLayout(selectorLayout);
   chartLayout->addWidget(stockChartView);
   mainTabWidget->addTab(chartTab, "Stock Chart");
   chart_tab_id = tab_cnt++;
+
   // --- Data Fetcher Setup ---
   dataFetcher = new StockDataFetcher(this);  // 'this' sets MainWindow as parent
                                              // --- Database Manager Setup ---
@@ -123,7 +131,7 @@ MainWindow::MainWindow(QWidget *parent):
   connect(dataFetcher, &StockDataFetcher::fetchError, this, &MainWindow::onStockDataFetchError);
   connect(dataFetcher, &StockDataFetcher::invalidStockDataFetched, this, &MainWindow::onInvalidStockDataFetched);
   connect(dataFetcher, &StockDataFetcher::historicalDataFetched, this, &MainWindow::onHistoricalDataFetched);
-  // Initial call to update the list display (it will be empty initially)
+  // Stock chart view connects
   connect(stockChartView, &QChartView::rubberBandChanged, this, [this](QRect rubberBand, QPointF fromScenePoint, QPointF toScenePoint) {
     (void)fromScenePoint;
     (void)toScenePoint;
@@ -134,12 +142,16 @@ MainWindow::MainWindow(QWidget *parent):
       }
     }
   });
-
+  connect(m_stockSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onStockSelectionChanged);
   // Initial auto-scale
   if (AutoScaleChartView *autoChartView = qobject_cast<AutoScaleChartView *>(stockChartView)) {
     autoChartView->autoScaleYAxis();
   }
   trackedStocks = dbManager->loadAllStocks();
+  setupPlaceholderChart();
+  setupStockSelector();
+
+  m_hasPlaceholderChart = true;
   updateStockListDisplay();
   //   dataFetcher->setAPIKey();
 }
@@ -202,6 +214,7 @@ void MainWindow::onStockListItemClicked(QListWidgetItem *item) {
       qDebug() << "Historical data for" << symbol << "is recent. Using cached data.";
       if (stock->getHistoricalPrices().size() == 0) {
         stock->setHistoricalPrices(dbManager->loadHistoricalPrices(stock->getSymbol()));
+        setupStockSelector();
       }
       updateChart(*stock);  // Use existing historical data
       mainTabWidget->setCurrentIndex(chart_tab_id);
@@ -305,6 +318,7 @@ void MainWindow::onHistoricalDataFetched(const QString &symbol, const QMap<time_
     dbManager->updateHistoricalPrices(symbol, historicalData);
     // Also update the stock's last_historical_fetch_time in the main stocks table
     dbManager->addOrUpdateStock(*stock);  // This will update the fetch time
+    setupStockSelector();
   } else {
     qWarning() << "Received historical data for unknown stock:" << symbol;
   }
@@ -395,9 +409,9 @@ void MainWindow::updateChart(const Stock &stock) {
   }
   axisY->setRange(qMax(minPrice * 0.95, 0.0), maxPrice * 1.05);  // Add a small buffer
 
-  chart->setTitle(QString("Historical Price for %1").arg(stock.getSymbol()));
-  chart->legend()->setVisible(true);
-  chart->legend()->setAlignment(Qt::AlignBottom);
+  chart->setTitle(QString("Historical Price for $%1").arg(stock.getSymbol()));
+  // chart->legend()->setVisible(true);
+  // chart->legend()->setAlignment(Qt::AlignBottom);
 
   // Enable zooming and panning
   //   stockChartView->setRubberBand(QChartView::RectangleRubberBand);
@@ -416,5 +430,74 @@ void MainWindow::updateChart(const Stock &stock) {
   // });
 
   // Re-draw chart (though usually not strictly necessary after setting series and axes)
-  stockChartView->chart()->setTheme(QChart::ChartThemeLight);  // Optional: apply a theme
+  stockChartView->chart()->setTheme(QChart::ChartThemeDark);  // Optional: apply a theme
+}
+
+void MainWindow::setupPlaceholderChart() {
+  // Create the placeholder chart
+  QChart *chart = stockChartView->chart();
+  chart->setTitle("Select a stock to view data");
+  chart->setTitleBrush(QBrush(Qt::gray));
+
+  // Create abstract axes with no labels/numbers
+  QValueAxis *xAxis = new QValueAxis();
+  QValueAxis *yAxis = new QValueAxis();
+
+  // Hide axis labels and ticks but keep the axis lines
+  xAxis->setLabelsVisible(false);
+  xAxis->setTickCount(0);
+  xAxis->setMinorTickCount(0);
+  xAxis->setRange(0, 100);
+  xAxis->setTitleText("Time");
+  xAxis->setTitleBrush(QBrush(Qt::gray));
+
+  yAxis->setLabelsVisible(false);
+  yAxis->setTickCount(0);
+  yAxis->setMinorTickCount(0);
+  yAxis->setRange(0, 100);
+  yAxis->setTitleText("Price");
+  yAxis->setTitleBrush(QBrush(Qt::gray));
+
+  // Add axes to chart
+  chart->addAxis(xAxis, Qt::AlignBottom);
+  chart->addAxis(yAxis, Qt::AlignLeft);
+
+  // Create placeholder data (optional - shows a generic curve)
+  // createPlaceholderData(chart, xAxis, yAxis);
+
+  // Set the chart to your chart view
+  stockChartView->setChart(chart);
+  stockChartView->setRenderHint(QPainter::Antialiasing);
+}
+
+void MainWindow::setupStockSelector() {
+  // Create the dropdown selector
+  m_stockSelector->clear();
+  m_stockSelector->addItem("Select a stock...", QVariant());  // Default placeholder item
+
+  // Populate with available stocks
+  for (const Stock &stock : trackedStocks) {
+    if (stock.getHistoricalPrices().size() == 0) {
+      continue;
+    }
+    m_stockSelector->addItem(stock.getSymbol() + " - " + stock.getName(), QVariant::fromValue(stock));
+  }
+}
+void MainWindow::onStockSelectionChanged(int index) {
+  if (index <= 0) {
+    // First item (placeholder) selected or invalid index
+    if (!m_hasPlaceholderChart) {
+      setupPlaceholderChart();
+      m_hasPlaceholderChart = true;
+    }
+    return;
+  }
+
+  // Get selected stock
+  QVariant stockData = m_stockSelector->itemData(index);
+  if (stockData.isValid()) {
+    Stock selectedStock = stockData.value<Stock>();
+    updateChart(selectedStock);
+    m_hasPlaceholderChart = false;
+  }
 }
