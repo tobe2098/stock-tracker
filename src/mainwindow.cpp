@@ -393,7 +393,7 @@ void MainWindow::updateChart(const Stock &stock) {
       }
     }
   }
-  axisY->setRange(minPrice * 0.95, maxPrice * 1.05);  // Add a small buffer
+  axisY->setRange(qMax(minPrice * 0.95, 0.0), maxPrice * 1.05);  // Add a small buffer
 
   chart->setTitle(QString("Historical Price for %1").arg(stock.getSymbol()));
   chart->legend()->setVisible(true);
