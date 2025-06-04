@@ -29,6 +29,7 @@ set(HEADERS
     src/stock.hpp
     src/stockdatafetcher.hpp
     src/datamanager.hpp
+    src/autoscalechartview.hpp
     )
 
 # Add executable

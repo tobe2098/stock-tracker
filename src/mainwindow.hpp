@@ -25,6 +25,7 @@
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QValueAxis>  // For value axis
 // Include our custom Stock class (Model)
+#include "autoscalechartview.hpp"
 #include "datamanager.hpp"
 #include "stock.hpp"
 #include "stockdatafetcher.hpp"

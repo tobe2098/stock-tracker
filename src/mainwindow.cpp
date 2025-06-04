@@ -87,8 +87,8 @@ MainWindow::MainWindow(QWidget *parent):
   // --- Stock Chart Tab Setup ---
   chartTab                 = new QWidget(this);
   QVBoxLayout *chartLayout = new QVBoxLayout(chartTab);
-  stockChartView           = new QChartView(this);        // Initialize QChartView
-  stockChartView->setRenderHint(QPainter::Antialiasing);  // For smoother rendering
+  stockChartView           = new AutoScaleChartView(this);  // Initialize QChartView
+  stockChartView->setRenderHint(QPainter::Antialiasing);    // For smoother rendering
   chartLayout->addWidget(stockChartView);
   mainTabWidget->addTab(chartTab, "Stock Chart");
   chart_tab_id = tab_cnt++;
@@ -124,6 +124,21 @@ MainWindow::MainWindow(QWidget *parent):
   connect(dataFetcher, &StockDataFetcher::invalidStockDataFetched, this, &MainWindow::onInvalidStockDataFetched);
   connect(dataFetcher, &StockDataFetcher::historicalDataFetched, this, &MainWindow::onHistoricalDataFetched);
   // Initial call to update the list display (it will be empty initially)
+  connect(stockChartView, &QChartView::rubberBandChanged, this, [this](QRect rubberBand, QPointF fromScenePoint, QPointF toScenePoint) {
+    (void)fromScenePoint;
+    (void)toScenePoint;
+    if (rubberBand.isEmpty()) {
+      // Rubber band zoom completed, auto-scale Y-axis
+      if (AutoScaleChartView *autoChartView = qobject_cast<AutoScaleChartView *>(stockChartView)) {
+        autoChartView->autoScaleYAxis();
+      }
+    }
+  });
+
+  // Initial auto-scale
+  if (AutoScaleChartView *autoChartView = qobject_cast<AutoScaleChartView *>(stockChartView)) {
+    autoChartView->autoScaleYAxis();
+  }
   trackedStocks = dbManager->loadAllStocks();
   updateStockListDisplay();
   //   dataFetcher->setAPIKey();
@@ -351,7 +366,7 @@ void MainWindow::updateChart(const Stock &stock) {
 
   // Create custom X-axis for Date/Time
   QDateTimeAxis *axisX = new QDateTimeAxis();
-  axisX->setFormat("MMM dd hh:mm");  // Format for dates
+  axisX->setFormat("dd/MM/yyyy");  // Format for dates
   axisX->setTitleText("Date");
   chart->addAxis(axisX, Qt::AlignBottom);  // or appropriate alignment
   series->attachAxis(axisX);
@@ -387,7 +402,7 @@ void MainWindow::updateChart(const Stock &stock) {
   // Enable zooming and panning
   //   stockChartView->setRubberBand(QChartView::RectangleRubberBand);
   // Enable zooming and panning - REPLACE your current interaction code with this:
-  stockChartView->setRubberBand(QChartView::RectangleRubberBand);
+  // stockChartView->setRubberBand(QChartView::RectangleRubberBand);
   stockChartView->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(stockChartView, &QChartView::customContextMenuRequested, this, [this]() { stockChartView->chart()->zoomReset(); });
 
