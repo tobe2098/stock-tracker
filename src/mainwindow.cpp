@@ -13,6 +13,7 @@
 #include <QtCharts/QValueAxis>  // For value axis
 
 #include <QCoreApplication>  // Needed for QCoreApplication::applicationDirPath()
+#include "sliw.hpp"
 // Constructor implementation
 static int tab_cnt = 0, stock_tab_id = 0, heatmap_tab_id = 0, chart_tab_id = 0;
 MainWindow::MainWindow(QWidget *parent):
@@ -203,39 +204,137 @@ void MainWindow::onAddStockButtonClicked() {
 void MainWindow::onStockListItemClicked(QListWidgetItem *item) {
   // Extract the symbol from the clicked item's text.
   // We assume the format is "SYMBOL (Name) - Current Price: $X.XX"
-  QString symbol = item->text().split(" ")[0];
-  Stock  *stock  = findStockBySymbol(symbol);  // Get stock from in-memory list
-  qDebug() << "Selected stock:" << symbol;
-  if (stock) {
-    displayStockDetails(*stock);
+  StockListItemWidget *customWidget = qobject_cast<StockListItemWidget *>(stockListWidget->itemWidget(item));
+  if (customWidget) {
+    QString symbol = customWidget->findChild<QLabel *>()->text().split(" ")[0];
+    Stock  *stock  = findStockBySymbol(symbol);  // Get stock from in-memory list
+    qDebug() << "Selected stock:" << symbol;
+    if (stock) {
+      displayStockDetails(*stock);
 
-    time_record_t now = QDateTime::currentSecsSinceEpoch();
-    if (stock->getLastHistoricalFetchTime() != 0 && now - stock->getLastHistoricalFetchTime() < HISTORICAL_CACHE_LIFETIME_SECS) {
-      qDebug() << "Historical data for" << symbol << "is recent. Using cached data.";
-      if (stock->getHistoricalPrices().size() == 0) {
-        stock->setHistoricalPrices(dbManager->loadHistoricalPrices(stock->getSymbol()));
-        setupStockSelector();
+      time_record_t now = QDateTime::currentSecsSinceEpoch();
+      if (stock->getLastHistoricalFetchTime() != 0 && now - stock->getLastHistoricalFetchTime() < HISTORICAL_CACHE_LIFETIME_SECS) {
+        qDebug() << "Historical data for" << symbol << "is recent. Using cached data.";
+        if (stock->getHistoricalPrices().size() == 0) {
+          stock->setHistoricalPrices(dbManager->loadHistoricalPrices(stock->getSymbol()));
+          setupStockSelector();
+        }
+        updateChart(*stock);  // Use existing historical data
+        mainTabWidget->setCurrentIndex(chart_tab_id);
+        return;
       }
-      updateChart(*stock);  // Use existing historical data
-      mainTabWidget->setCurrentIndex(chart_tab_id);
-      return;
-    }
 
-    qDebug() << "Historical data for" << symbol << "is stale. Fetching...";
-    dataFetcher->fetchHistoricalData(symbol);
+      qDebug() << "Historical data for" << symbol << "is stale. Fetching...";
+      dataFetcher->fetchHistoricalData(symbol);
+    }
   }
 }
+// NEW SLOT: Handles "Remove from RAM" button click
+void MainWindow::onRemoveStockFromRamClicked(const QString &symbol) {
+  QMessageBox::StandardButton reply;
+  reply = QMessageBox::question(
+    this, "Remove Stock",
+    QString("Are you sure you want to remove '%1' from the tracked list? It will remain in the database.").arg(symbol),
+    QMessageBox::Yes | QMessageBox::No);
+  if (reply == QMessageBox::Yes) {
+    int indexToRemove = -1;
+    for (int i = 0; i < trackedStocks.size(); ++i) {
+      if (trackedStocks.at(i).getSymbol() == symbol) {
+        indexToRemove = i;
+        break;
+      }
+    }
 
+    if (indexToRemove != -1) {
+      trackedStocks.removeAt(indexToRemove);  // Remove from our in-memory list
+      // Find and remove the corresponding QListWidgetItem
+      for (int i = 0; i < stockListWidget->count(); ++i) {
+        QListWidgetItem *item = stockListWidget->item(i);
+        // When using setItemWidget, the item->text() is usually empty
+        // so we rely on finding the widget itself
+        StockListItemWidget *customWidget = qobject_cast<StockListItemWidget *>(stockListWidget->itemWidget(item));
+        if (customWidget &&
+            customWidget->findChild<QLabel *>()->text().startsWith(symbol + " (")) {  // Crude check, but works for our format
+          delete stockListWidget->takeItem(i);                                        // Take item and delete it
+          break;
+        }
+      }
+      // updateStockListDisplay();                                      // Refresh the list if needed (though direct removal might be
+      // faster)
+      stockDetailsLabel->setText("Select a stock to see details.");  // Clear details
+      qDebug() << "Stock" << symbol << "removed from RAM.";
+    }
+  }
+}
+// NEW SLOT: Handles "Delete from DB" button click
+void MainWindow::onDeleteStockFromDbClicked(const QString &symbol) {
+  QMessageBox::StandardButton reply;
+  reply = QMessageBox::question(
+    this, "Delete Stock",
+    QString("Are you sure you want to PERMANENTLY delete '%1' from the database and tracked list? This cannot be undone.").arg(symbol),
+    QMessageBox::Yes | QMessageBox::No);
+  if (reply == QMessageBox::Yes) {
+    if (dbManager->deleteStock(symbol)) {  // Delete from database
+      // If successfully deleted from DB, also remove from RAM and UI
+      int indexToRemove = -1;
+      for (int i = 0; i < trackedStocks.size(); ++i) {
+        if (trackedStocks.at(i).getSymbol() == symbol) {
+          indexToRemove = i;
+          break;
+        }
+      }
+
+      if (indexToRemove != -1) {
+        trackedStocks.removeAt(indexToRemove);  // Remove from in-memory list
+      }
+      // Remove the corresponding QListWidgetItem
+      for (int i = 0; i < stockListWidget->count(); ++i) {
+        QListWidgetItem     *item         = stockListWidget->item(i);
+        StockListItemWidget *customWidget = qobject_cast<StockListItemWidget *>(stockListWidget->itemWidget(item));
+        if (customWidget && customWidget->findChild<QLabel *>()->text().startsWith(symbol + " (")) {
+          delete stockListWidget->takeItem(i);
+          break;
+        }
+      }
+      // updateStockListDisplay();                                      // Refresh the list if needed
+      stockDetailsLabel->setText("Select a stock to see details.");  // Clear details
+      QMessageBox::information(this, "Stock Deleted", QString("Stock '%1' has been permanently deleted.").arg(symbol));
+      qDebug() << "Stock" << symbol << "deleted from DB and RAM.";
+    } else {
+      QMessageBox::critical(this, "Deletion Error", QString("Failed to delete '%1' from the database.").arg(symbol));
+    }
+  }
+}
 // Helper method to update the QListWidget display
 void MainWindow::updateStockListDisplay() {
   stockListWidget->clear();  // Clear all existing items first
   for (const Stock &stock : trackedStocks) {
     // Format the text for each list item
     QString displayText =
-      QString("%1 (%2) - Current Price: $%3")
-        .arg(stock.getSymbol(), stock.getName(), QString::number(stock.getCurrentPrice(), 'f', 2)  // Format to 2 decimal places
+      QString("%1 (%2) - Current Price: $%3 | Change: %4%")
+        .arg(stock.getSymbol(), stock.getName(), QString::number(stock.getCurrentPrice(), 'f', 2),
+             QString::number((stock.getPriceChange() / stock.getCurrentPrice()) * 100.0, 'f', 2)  // Format to 2 decimal places
         );
-    stockListWidget->addItem(displayText);  // Add the formatted text as a new item
+    // Create the custom widget for the list item
+    // 'stockListWidget' is passed as the parent, ensuring proper memory management
+    StockListItemWidget *customItemWidget = new StockListItemWidget(stock.getSymbol(), displayText, stockListWidget);
+
+    // Create a QListWidgetItem and set its size hint to match the custom widget's preferred size
+    QListWidgetItem *item = new QListWidgetItem(stockListWidget);
+    item->setSizeHint(customItemWidget->sizeHint());  // Important for correct item height
+    // This is the crucial line: Associate our custom widget with the QListWidgetItem
+    stockListWidget->setItemWidget(item, customItemWidget);
+    // Connect the custom widget's signals to MainWindow's new slots
+    // This connects specific signals from 'customItemWidget' to slots in 'this' (MainWindow).
+    // Each 'customItemWidget' instance for each stock has its own connections.
+
+    // Connection for "Remove from RAM"
+    connect(customItemWidget, &StockListItemWidget::removeClicked, this, &MainWindow::onRemoveStockFromRamClicked);
+
+    // Connection for "Delete from DB"
+    connect(customItemWidget, &StockListItemWidget::deleteClicked, this, &MainWindow::onDeleteStockFromDbClicked);
+
+    stockListWidget->addItem(item);  // Add the formatted text as a new item
   }
 }
 

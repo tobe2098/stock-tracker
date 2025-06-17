@@ -12,6 +12,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
+#include <QStatusBar>  // Include for status bar
 #include <QTabWidget>  // To create tabs for different views (e.g., list, chart, heatmap)
 // Include layout classes
 #include <QDateTime>
@@ -69,6 +70,11 @@ class MainWindow : public QMainWindow {
     void onHistoricalDataFetched(const QString &symbol, const QMap<time_record_t, HistoricalDataRecord> &historicalData);  // New slot
     void onInvalidStockDataFetched(const QString &error);
     void onStockDataFetchError(const QString &symbol, const QString &errorString);
+    // void onRateLimitExceeded(const QString &message);
+
+    // NEW SLOTS for button clicks in custom item widgets
+    void onRemoveStockFromRamClicked(const QString &symbol);
+    void onDeleteStockFromDbClicked(const QString &symbol);
 
   private:
     // Declare pointers to our UI widgets.

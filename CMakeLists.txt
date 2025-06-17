@@ -22,6 +22,7 @@ set(SOURCES
     src/stock.cpp
     src/stockdatafetcher.cpp
     src/datamanager.cpp
+    src/sliw.cpp
     )
 # Set heaeder files
 set(HEADERS
@@ -30,6 +31,7 @@ set(HEADERS
     src/stockdatafetcher.hpp
     src/datamanager.hpp
     src/autoscalechartview.hpp
+    src/sliw.hpp
     )
 
 # Add executable
