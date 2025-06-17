@@ -12,10 +12,16 @@ StockListItemWidget::StockListItemWidget(const QString &symbol, const QString &d
   QHBoxLayout *layout = new QHBoxLayout(this);
   layout->setContentsMargins(5, 0, 5, 0);  // Smaller margins for compact buttons
   layout->setSpacing(5);                   // Spacing between elements
+  QFont labelFont;
+  labelFont.setPointSize(12);  // Adjust size as needed (default is usually 8-10)
+  // labelFont.setBold(true); // Optional: make it bold
 
+  // Apply to your main text label
   // Stock Label
   stockLabel = new QLabel(displayText, this);
   stockLabel->setWordWrap(true);
+  stockLabel->setMinimumWidth(600);  // Adjust based on your typical text length
+  stockLabel->setFont(labelFont);
   layout->addWidget(stockLabel);
   layout->addStretch();  // Pushes buttons to the right
 

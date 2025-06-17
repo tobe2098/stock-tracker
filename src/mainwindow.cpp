@@ -310,11 +310,11 @@ void MainWindow::updateStockListDisplay() {
   stockListWidget->clear();  // Clear all existing items first
   for (const Stock &stock : trackedStocks) {
     // Format the text for each list item
-    QString displayText =
-      QString("%1 (%2) - Current Price: $%3 | Change: %4%")
-        .arg(stock.getSymbol(), stock.getName(), QString::number(stock.getCurrentPrice(), 'f', 2),
-             QString::number((stock.getPriceChange() / stock.getCurrentPrice()) * 100.0, 'f', 2)  // Format to 2 decimal places
-        );
+    QString displayText = QString("%1 (%2) - Current Price: $%3 (<span style='color:%5;'>%4%</span>)")
+                            .arg(stock.getSymbol(), stock.getName(), QString::number(stock.getCurrentPrice(), 'f', 2),
+                                 QString::number((stock.getPriceChange() / stock.getCurrentPrice()) * 100.0, 'f', 2),
+                                 (stock.getPriceChange() >= 0 ? "green" : "red")  // Format to 2 decimal places
+                            );
     // Create the custom widget for the list item
     // 'stockListWidget' is passed as the parent, ensuring proper memory management
     StockListItemWidget *customItemWidget = new StockListItemWidget(stock.getSymbol(), displayText, stockListWidget);

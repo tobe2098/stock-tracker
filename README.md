@@ -9,8 +9,8 @@ A stock-tracker using Qt and C++
 - Cross button for stocks (deletes from memory but not from database?) DONE
 - Delete button for stocks (deletes from memory and from database) DONE
 
-- Fetching notiffication only during fetching, not require click.
-- Rate limit calculations, tracking and message to avoid, but override.
+- Fetching notiffication only during fetching, not require click. Doing
+- Rate limit calculations, tracking and message to avoid, but override. Doing
 
 - Load json from API query for history (try to make it a rich query, intra and interday) DONE
 - Review annotations for what can be done (findstock and update without deleting, sorted stocks)
