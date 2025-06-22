@@ -5,6 +5,7 @@
 // #include <QDateTime>
 #include <QDebug>       // For debugging output (like console.log in JS)
 #include <QMessageBox>  // For simple pop-up messages (instead of alert())
+#include <QStringList>
 // Qt Charts specific includes
 #include <QtCharts/QChart>
 #include <QtCharts/QChartView>
@@ -21,7 +22,6 @@ MainWindow::MainWindow(QWidget *parent):
 {
   // Set the window title and initial size
   setWindowTitle("Stock Tracker");
-  resize(1024, 768);
 
   // --- UI Setup ---
 
@@ -82,18 +82,40 @@ MainWindow::MainWindow(QWidget *parent):
 
   // Add the settings button at the bottom of the main layout, or in a toolbar.
   // For simplicity, let's put it below the tabs for now.
-  settingsButton = new QPushButton("Settings", this);
-  mainLayout->addWidget(settingsButton);
-
+  // settingsButton = new QPushButton("&#9881", this);
+  settingsButton = new QPushButton("\u2699", this);
+  mainTabWidget->setCornerWidget(settingsButton, Qt::TopRightCorner);
+  // mainLayout->addWidget(settingsButton);
+  // --- Bottom Section: Status Bar ---
+  // Create and setup status bar
+  QStatusBar *statusBar = this->statusBar();  // This creates the status bar if it doesn't exist
+  // Create countdown timer widget
+  rateLimitTimer = new CountdownTimer(this);
+  // Add countdown timer to status bar (permanent widget stays on the right)
+  statusBar->addPermanentWidget(rateLimitTimer);
+  statusBar->setSizeGripEnabled(false);
+  // statusBar->setStyleSheet("QStatusBar { border: none; }");
+  // statusBar->setContentsMargins(0, 0, 0, 0);
+  // rateLimitTimer->setContentsMargins(0, 0, 0, 0);
+  // You can also add temporary messages that appear on the left
+  statusBar->showMessage("Ready", 2000);
+  // statusBar->setStyleSheet(
+  //   "QStatusBar {"
+  //   "    background-color: #f0f0f0;"
+  //   "    border-top: 1px solid #ccc;"
+  //   "}"
+  //   "QStatusBar::item {"
+  //   "    border: none;"
+  //   "}");
   // --- Stock Chart Tab Setup ---
   chartTab                    = new QWidget(this);
   QVBoxLayout *chartLayout    = new QVBoxLayout(chartTab);
   stockChartView              = new AutoScaleChartView(this);  // Initialize QChartView
-  m_stockSelector             = new QComboBox();
+  stockSelector               = new QComboBox();
   QHBoxLayout *selectorLayout = new QHBoxLayout();
   QLabel      *selectorLabel  = new QLabel("Stock:");
   selectorLayout->addWidget(selectorLabel);
-  selectorLayout->addWidget(m_stockSelector);
+  selectorLayout->addWidget(stockSelector);
   selectorLayout->addStretch();
   stockChartView->setRenderHint(QPainter::Antialiasing);  // For smoother rendering
   chartLayout->addLayout(selectorLayout);
@@ -102,14 +124,21 @@ MainWindow::MainWindow(QWidget *parent):
   chart_tab_id = tab_cnt++;
 
   // --- Data Fetcher Setup ---
-  dataFetcher = new StockDataFetcher(this);  // 'this' sets MainWindow as parent
-                                             // --- Database Manager Setup ---
+  networkThread = new QThread(this);
+  dataFetcher   = new StockDataFetcher();  // 'this' sets MainWindow as parent
+  dataFetcher->moveToThread(networkThread);
+  networkThread->start();
+  // --- Database Manager Setup ---
   // Use QCoreApplication::applicationDirPath() for the database file location
   dbManager = new DatabaseManager(QCoreApplication::applicationDirPath() + "/" + DATABASE_FILE_PATH, this);
   if (!dbManager->openDatabase()) {
     QMessageBox::critical(this, "Database Error", "Failed to open or create database. Application may not function correctly.");
     // Consider handling this more gracefully, e.g., disabling features
   }
+  // Settings init
+  settings = new QSettings("tobe2098", "stock_tracker", this);
+  this->restoreGeometry(settings->value("windowGeometry").toByteArray());
+
   // --- Signal-Slot Connections ---
   // Connect the 'clicked' signal of the addStockButton to our 'onAddStockButtonClicked' slot.
   // When the button is clicked, our slot function will be executed.
@@ -128,10 +157,17 @@ MainWindow::MainWindow(QWidget *parent):
   // Optional: Connect to tab changes if you want to update content dynamically
   connect(mainTabWidget, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
   // Connect StockDataFetcher signals to MainWindow slots
+  connect(networkThread, &QThread::finished, dataFetcher, &QObject::deleteLater);
   connect(dataFetcher, &StockDataFetcher::stockDataFetched, this, &MainWindow::onStockDataFetched);
   connect(dataFetcher, &StockDataFetcher::fetchError, this, &MainWindow::onStockDataFetchError);
   connect(dataFetcher, &StockDataFetcher::invalidStockDataFetched, this, &MainWindow::onInvalidStockDataFetched);
   connect(dataFetcher, &StockDataFetcher::historicalDataFetched, this, &MainWindow::onHistoricalDataFetched);
+  connect(dataFetcher, &StockDataFetcher::requestRateLimitExceeded, this, &MainWindow::onRateLimitExceeded);
+  connect(rateLimitTimer, &CountdownTimer::finished, dataFetcher, &StockDataFetcher::onHistoricalRequestTimerTimeout);
+  QMetaObject::invokeMethod(dataFetcher, "initialize", Qt::QueuedConnection);
+  QMetaObject::invokeMethod(dataFetcher, "loadHistoricalRequestList", Qt::QueuedConnection,
+                            Q_ARG(QStringList, settings->value("usageList").toStringList()));
+
   // Stock chart view connects
   connect(stockChartView, &QChartView::rubberBandChanged, this, [this](QRect rubberBand, QPointF fromScenePoint, QPointF toScenePoint) {
     (void)fromScenePoint;
@@ -143,7 +179,7 @@ MainWindow::MainWindow(QWidget *parent):
       }
     }
   });
-  connect(m_stockSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onStockSelectionChanged);
+  connect(stockSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onStockSelectionChanged);
   // Initial auto-scale
   if (AutoScaleChartView *autoChartView = qobject_cast<AutoScaleChartView *>(stockChartView)) {
     autoChartView->autoScaleYAxis();
@@ -152,13 +188,58 @@ MainWindow::MainWindow(QWidget *parent):
   setupPlaceholderChart();
   setupStockSelector();
 
-  m_hasPlaceholderChart = true;
+  hasPlaceholderChart = true;
   updateStockListDisplay();
+  // Only way that seems to work is setting a timer.
+  QTimer::singleShot(0, this, [this]() {
+    QByteArray savedGeometry = settings->value("windowGeometry").toByteArray();
+    if (!savedGeometry.isEmpty()) {
+      qDebug() << "Restoring geometry, size:" << savedGeometry.size();
+      bool success = this->restoreGeometry(savedGeometry);
+      qDebug() << "Restore geometry success:" << success;
+      if (!success) {
+        qDebug() << "Failed to restore geometry, using default size";
+        resize(1024, 768);
+      }
+    }
+  });
+  QTimer::singleShot(0, this, [this]() {
+    qint64 remaining_time;
+    QMetaObject::invokeMethod(dataFetcher, "getTimeToNextRequest", Qt::BlockingQueuedConnection,
+                              Q_RETURN_ARG(time_record_t, remaining_time));
+    rateLimitTimer->setTargetTime(remaining_time);
+    // QMetaObject::invokeMethod(rateLimitTimer, "setTargetTime", Qt::QueuedConnection, Q_ARG(qint64, remaining_time));//Has to be declared
+    // as a stop
+  });
   //   dataFetcher->setAPIKey();
 }
 
 // Destructor implementation (empty as Qt's parent-child ownership handles deletion)
 MainWindow::~MainWindow() {
+  QByteArray window_geometry { this->saveGeometry() };
+  settings->setValue("windowGeometry", window_geometry);
+  QStringList request_list;
+  bool        success { QMetaObject::invokeMethod(dataFetcher, "saveHistoricalRequestList", Qt::BlockingQueuedConnection,
+                                                  Q_RETURN_ARG(QStringList, request_list)) };
+  if (success) {
+    settings->setValue("usageList", request_list);
+    // qDebug() << "Got result:" << window_geometry;
+  } else {
+    qDebug() << "Could not get request list.";
+  }
+  if (networkThread && networkThread->isRunning()) {
+    // Request thread to quit
+    networkThread->quit();
+
+    // Wait for thread to finish (with timeout)
+    if (!networkThread->wait(5000)) {  // Wait up to 5 seconds
+      // If thread doesn't quit gracefully, force terminate
+      qWarning() << "Network thread didn't quit gracefully, terminating...";
+      networkThread->terminate();
+      networkThread->wait();  // Wait for termination
+    }
+  }
+
   qDebug() << "MainWindow destroyed.";
 }
 // Override for saving on application exit (now saving to DB)
@@ -195,7 +276,7 @@ void MainWindow::onAddStockButtonClicked() {
   }
 
   // Instead of creating a dummy stock, request data from the fetcher
-  dataFetcher->fetchStockData(symbol);
+  QMetaObject::invokeMethod(dataFetcher, "fetchStockData", Qt::QueuedConnection, Q_ARG(QString, symbol));
 
   stockSymbolLineEdit->clear();
 }
@@ -225,7 +306,7 @@ void MainWindow::onStockListItemClicked(QListWidgetItem *item) {
       }
 
       qDebug() << "Historical data for" << symbol << "is stale. Fetching...";
-      dataFetcher->fetchHistoricalData(symbol);
+      QMetaObject::invokeMethod(dataFetcher, "fetchHistoricalData", Qt::QueuedConnection, Q_ARG(QString, symbol));
     }
   }
 }
@@ -432,6 +513,11 @@ void MainWindow::onInvalidStockDataFetched(const QString &error) {
   QMessageBox::critical(this, "Network Error", error);
 }
 
+void MainWindow::onRateLimitExceeded(const QString &message, qint64 remaining_time) {
+  QMessageBox::critical(this, "Rate Limit exceeded", message);
+  rateLimitTimer->setTargetTime(remaining_time);
+}
+
 // Helper method to find a stock by its symbol in the trackedStocks list
 Stock *MainWindow::findStockBySymbol(const QString &symbol) {
   for (int i = 0; i < trackedStocks.size(); ++i) {
@@ -535,8 +621,17 @@ void MainWindow::updateChart(const Stock &stock) {
 void MainWindow::setupPlaceholderChart() {
   // Create the placeholder chart
   QChart *chart = stockChartView->chart();
+  if (!chart) {
+    chart = new QChart();
+    stockChartView->setChart(chart);
+  }
+  chart->removeAllSeries();  // Clear any previous series
+  QList<QAbstractAxis *> axes = chart->axes();
+  for (QAbstractAxis *axis : axes) {
+    chart->removeAxis(axis);
+  }
   chart->setTitle("Select a stock to view data");
-  chart->setTitleBrush(QBrush(Qt::gray));
+  // chart->setTitleBrush(QBrush(Qt::gray));
 
   // Create abstract axes with no labels/numbers
   QValueAxis *xAxis = new QValueAxis();
@@ -547,15 +642,15 @@ void MainWindow::setupPlaceholderChart() {
   xAxis->setTickCount(0);
   xAxis->setMinorTickCount(0);
   xAxis->setRange(0, 100);
-  xAxis->setTitleText("Time");
-  xAxis->setTitleBrush(QBrush(Qt::gray));
+  xAxis->setTitleText("Date");
+  // xAxis->setTitleBrush(QBrush(Qt::gray));
 
   yAxis->setLabelsVisible(false);
   yAxis->setTickCount(0);
   yAxis->setMinorTickCount(0);
   yAxis->setRange(0, 100);
-  yAxis->setTitleText("Price");
-  yAxis->setTitleBrush(QBrush(Qt::gray));
+  yAxis->setTitleText("Price ($)");
+  // yAxis->setTitleBrush(QBrush(Qt::gray));
 
   // Add axes to chart
   chart->addAxis(xAxis, Qt::AlignBottom);
@@ -567,36 +662,37 @@ void MainWindow::setupPlaceholderChart() {
   // Set the chart to your chart view
   stockChartView->setChart(chart);
   stockChartView->setRenderHint(QPainter::Antialiasing);
+  stockChartView->chart()->setTheme(QChart::ChartThemeDark);  // Optional: apply a theme
 }
 
 void MainWindow::setupStockSelector() {
   // Create the dropdown selector
-  m_stockSelector->clear();
-  m_stockSelector->addItem("Select a stock...", QVariant());  // Default placeholder item
+  stockSelector->clear();
+  stockSelector->addItem("Select a stock...", QVariant());  // Default placeholder item
 
   // Populate with available stocks
   for (const Stock &stock : trackedStocks) {
     if (stock.getHistoricalPrices().size() == 0) {
       continue;
     }
-    m_stockSelector->addItem(stock.getSymbol() + " - " + stock.getName(), QVariant::fromValue(stock));
+    stockSelector->addItem(stock.getSymbol() + " - " + stock.getName(), QVariant::fromValue(stock));
   }
 }
 void MainWindow::onStockSelectionChanged(int index) {
   if (index <= 0) {
     // First item (placeholder) selected or invalid index
-    if (!m_hasPlaceholderChart) {
+    if (!hasPlaceholderChart) {
       setupPlaceholderChart();
-      m_hasPlaceholderChart = true;
+      hasPlaceholderChart = true;
     }
     return;
   }
 
   // Get selected stock
-  QVariant stockData = m_stockSelector->itemData(index);
+  QVariant stockData = stockSelector->itemData(index);
   if (stockData.isValid()) {
     Stock selectedStock = stockData.value<Stock>();
     updateChart(selectedStock);
-    m_hasPlaceholderChart = false;
+    hasPlaceholderChart = false;
   }
 }

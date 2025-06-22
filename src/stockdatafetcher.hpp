@@ -14,6 +14,7 @@
 #include <QQueue>
 #include <QRandomGenerator>
 #include <QString>
+#include <QStringList>
 #include <QTextStream>
 #include <QTimer>
 #include <QUrl>  // For URLs
@@ -33,6 +34,16 @@ class StockDataFetcher : public QObject {
     // Slot to initiate fetching data for a given stock symbol
     void fetchStockData(const QString &symbol);
     void fetchHistoricalData(const QString &symbol);  // New slot for historical data
+
+    void        loadHistoricalRequestList(QStringList points_list);
+    QStringList saveHistoricalRequestList();
+
+    void initialize();
+
+    time_record_t getTimeToNextRequest() const noexcept {
+      return HISTORICAL_REQUESTS_INTERVAL - QDateTime::currentSecsSinceEpoch() + lastHistoricalRequests.at(earliestRequest);
+    }
+    void onHistoricalRequestTimerTimeout();
   signals:
     // Signal emitted when stock data is successfully fetched
     void stockDataFetched(const Stock &stock);
@@ -40,7 +51,7 @@ class StockDataFetcher : public QObject {
     void invalidStockDataFetched(const QString &error);
     // Signal emitted if there's an error during fetching
     void fetchError(const QString &symbol, const QString &errorString);
-    void requestRateLimitExceeded(const QString &message);  // New signal for rate limit info
+    void requestRateLimitExceeded(const QString &message, qint64 remaining_time);  // New signal for rate limit info
   private slots:
     // Slot to handle the finished signal from QNetworkAccessManager
     void onNetworkReplyFinished(QNetworkReply *reply);
@@ -52,19 +63,21 @@ class StockDataFetcher : public QObject {
     QString                apiKeyQuote;
     QString                apiKeyHistorical;
 
-    QQueue<QString> symbolQueue;             // Queue of symbols to fetch
-    QQueue<QString> historicalQueue;         // New queue for historical requests (symbol, daysBack)
-    QTimer         *symbolRequestTimer;      // Timer to control request rate
-    QTimer         *historicalRequestTimer;  // Timer to control request rate
+    QQueue<QString> symbolQueue;         // Queue of symbols to fetch
+    QQueue<QString> historicalQueue;     // New queue for historical requests (symbol, daysBack)
+    QTimer         *symbolRequestTimer;  // Timer to control request rate
 
-    const quint64 SYMBOL_REQUEST_INTERVAL_MS { 1100 };      // Example: 1.1 seconds
-    const quint64 HISTORICAL_REQUEST_INTERVAL_MS { 1100 };  // Example: 1.1 seconds
+    QList<time_record_t> lastHistoricalRequests;
+    quint64              earliestRequest;
+    const static qint64  SYMBOL_REQUEST_INTERVAL_MS { 1100 };  // Example: 1.1 seconds
+    const static qint64  MAX_HISTORICAL_REQUESTS_PER_INTERVAL { 1 };
+    const static qint64  HISTORICAL_REQUESTS_INTERVAL { 1 * 24 * 3600 };  // In seconds
+    // const quint64 HISTORICAL_REQUEST_INTERVAL_MS { 1100 };  // Example: 1.1 seconds
     // Static member to hold the custom attribute ID
     const static QNetworkRequest::Attribute RequestTypeAttributeId { QNetworkRequest::Attribute(QNetworkRequest::User + 1) };
     const static QNetworkRequest::Attribute NoDaysHistoricRequest { QNetworkRequest::Attribute(QNetworkRequest::User + 2) };
 
-    bool isFetchingSymbol;      // Flag to prevent multiple simultaneous fetches (if API only allows one at a time)
-    bool isFetchingHistorical;  // Flag to prevent multiple simultaneous fetches (if API only allows one at a time)
+    bool isFetchingSymbol;  // Flag to prevent multiple simultaneous fetches (if API only allows one at a time)
     bool keyValidatedQuote;
     bool keyValidatedHistorical;
     void setAPIKeyQuote();

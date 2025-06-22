@@ -18,6 +18,8 @@
 #include <QDateTime>
 #include <QHBoxLayout>  // Horizontal Box Layout
 #include <QRandomGenerator>
+#include <QSettings>
+#include <QThread>
 #include <QVBoxLayout>  // Vertical Box Layout
 #include <QtGlobal>
 // Qt Charts specific includes
@@ -28,6 +30,7 @@
 #include <QtCharts/QValueAxis>  // For value axis
 // Include our custom Stock class (Model)
 #include "autoscalechartview.hpp"
+#include "countdowntimer.hpp"
 #include "datamanager.hpp"
 #include "stock.hpp"
 #include "stockdatafetcher.hpp"
@@ -70,7 +73,7 @@ class MainWindow : public QMainWindow {
     void onHistoricalDataFetched(const QString &symbol, const QMap<time_record_t, HistoricalDataRecord> &historicalData);  // New slot
     void onInvalidStockDataFetched(const QString &error);
     void onStockDataFetchError(const QString &symbol, const QString &errorString);
-    // void onRateLimitExceeded(const QString &message);
+    void onRateLimitExceeded(const QString &message, qint64 remaining_time);
 
     // NEW SLOTS for button clicks in custom item widgets
     void onRemoveStockFromRamClicked(const QString &symbol);
@@ -91,13 +94,18 @@ class MainWindow : public QMainWindow {
     QWidget    *heatmapTab;
 
     QChartView *stockChartView;
-    QComboBox  *m_stockSelector;
-    bool        m_hasPlaceholderChart;
+    QComboBox  *stockSelector;
+    bool        hasPlaceholderChart;
 
     QPushButton *settingsButton;
 
+    CountdownTimer *rateLimitTimer;
+
+    // Settings object
+    QSettings *settings;
     // Our new data fetcher instance
     StockDataFetcher *dataFetcher;
+    QThread          *networkThread;
     // Database manager
     DatabaseManager *dbManager;
     // This QList will hold our Stock objects. It represents the "data" part

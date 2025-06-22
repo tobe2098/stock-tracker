@@ -32,9 +32,9 @@ StockListItemWidget::StockListItemWidget(const QString &symbol, const QString &d
   // Using Unicode character for the cross icon
   removeButton->setText("\u274C");  // Red cross mark emoji
   // Optional: Style the button for visual appeal
-  removeButton->setStyleSheet(
-    "QPushButton { border: 1px solid #ccc; border-radius: 4px; background-color: #fdd; color: #d00; }"
-    "QPushButton:hover { background-color: #fcc; }");
+  // removeButton->setStyleSheet(
+  //   "QPushButton { border: 1px solid #ccc; border-radius: 4px; background-color: #fdd; color: #d00; }"
+  //   "QPushButton:hover { background-color: #fcc; }");
   layout->addWidget(removeButton);
 
   // "Delete from DB" Button (Bin/Trash)
@@ -44,9 +44,9 @@ StockListItemWidget::StockListItemWidget(const QString &symbol, const QString &d
   // Using Unicode character for the trash can icon
   deleteButton->setText("\U0001F5D1");  // Wastebasket emoji
   // Optional: Style the button
-  deleteButton->setStyleSheet(
-    "QPushButton { border: 1px solid #ccc; border-radius: 4px; background-color: #dee; color: #080; }"
-    "QPushButton:hover { background-color: #cff; }");
+  // deleteButton->setStyleSheet(
+  //   "QPushButton { border: 1px solid #ccc; border-radius: 4px; background-color: #dee; color: #080; }"
+  //   "QPushButton:hover { background-color: #cff; }");
   layout->addWidget(deleteButton);
 
   // Connect button clicks to internal slots that emit our custom signals

@@ -23,6 +23,7 @@ set(SOURCES
     src/stockdatafetcher.cpp
     src/datamanager.cpp
     src/sliw.cpp
+    src/countdowntimer.cpp
     )
 # Set heaeder files
 set(HEADERS
@@ -32,6 +33,7 @@ set(HEADERS
     src/datamanager.hpp
     src/autoscalechartview.hpp
     src/sliw.hpp
+    src/countdowntimer.hpp
     )
 
 # Add executable

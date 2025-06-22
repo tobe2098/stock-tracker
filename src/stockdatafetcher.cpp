@@ -10,19 +10,25 @@
 const QList<QString> api_paths_quote { QStringLiteral("/../../api_quote.txt"), QStringLiteral("/./api_quote.txt") };
 const QList<QString> api_paths_historical { QStringLiteral("/../../api_historical.txt"), QStringLiteral("/./api_historical.txt") };
 
+constexpr qint64 MAX_LIMIT_TIMER { 60'000 };
 // Constructor
 StockDataFetcher::StockDataFetcher(QObject *parent):
-    QObject(parent), manager(new QNetworkAccessManager(this)),  // 'this' sets StockDataFetcher as parent, handles deletion
-    symbolRequestTimer(new QTimer(this)), historicalRequestTimer(new QTimer(this)), isFetchingSymbol(false), isFetchingHistorical(false),
-    keyValidatedQuote(false), keyValidatedHistorical(false) {
+    QObject(parent), manager(nullptr),  // 'this' sets StockDataFetcher as parent, handles deletion
+    symbolRequestTimer(nullptr), isFetchingSymbol(false), keyValidatedQuote(false), keyValidatedHistorical(false) {
   // Connect the finished signal of the manager to our slot
+}
+void StockDataFetcher::initialize() {
+  manager            = new QNetworkAccessManager(this);
+  symbolRequestTimer = new QTimer(this);
   connect(manager, &QNetworkAccessManager::finished, this, &StockDataFetcher::onNetworkReplyFinished);
   // Connect timer timeout to our slot to process the queue
   connect(symbolRequestTimer, &QTimer::timeout, this, &StockDataFetcher::requestSymbolSlot);
-  connect(historicalRequestTimer, &QTimer::timeout, this, &StockDataFetcher::requestHistoricalSlot);
+  // connect(historicalRequestTimer, &QTimer::timeout, this, &StockDataFetcher::requestHistoricalSlot);
   // Start the timer, it will trigger processNextRequest every REQUEST_INTERVAL_MS
+  // historicalRequestTimer->start(HISTORICAL_REQUEST_INTERVAL_MS);
+
+  // Move timer to the new thread
   symbolRequestTimer->start(SYMBOL_REQUEST_INTERVAL_MS);
-  historicalRequestTimer->start(HISTORICAL_REQUEST_INTERVAL_MS);
 }
 void StockDataFetcher::setAPIKeyQuote() {
   QString key;
@@ -120,16 +126,17 @@ void StockDataFetcher::fetchHistoricalData(const QString &symbol) {
   // If not currently fetching, immediately try to process the next request
   // This allows the first request to go out without waiting for the timer,
   // and subsequent ones will be rate-limited.
-  if (!isFetchingHistorical) {
-    processNextRequestHistorical();
-  }
+  // if (!isFetchingHistorical) {
+  // if (!historicalRequestTimer->isActive()) {
+  processNextRequestHistorical();
+  // }
+  // }
 }
 void StockDataFetcher::requestSymbolSlot() {
   isFetchingSymbol = false;
   processNextRequestSymbol();
 }
 void StockDataFetcher::requestHistoricalSlot() {
-  isFetchingHistorical = false;
   processNextRequestHistorical();
 }
 // New slot to process requests from the queue
@@ -158,14 +165,29 @@ void StockDataFetcher::processNextRequestSymbol() {
 // New slot to process requests from the queue
 void StockDataFetcher::processNextRequestHistorical() {
   if (historicalQueue.isEmpty()) {
-    // qDebug() << "Request queue is empty.";
-    // Optionally, you might stop the timer here if no more requests are expected for a while
-    // m_requestTimer->stop();
+    // Should never happen if properly managed
+    qDebug() << "This should not happen (processNextRequestHistorical)";
+    //  qDebug() << "Request queue is empty.";
+    //  Optionally, you might stop the timer here if no more requests are expected for a while
+    //  m_requestTimer->stop();
     return;
   }
+  time_record_t elapsed_time { (QDateTime::currentSecsSinceEpoch() - lastHistoricalRequests[earliestRequest]) };
+  if (elapsed_time <= HISTORICAL_REQUESTS_INTERVAL) {
+    time_record_t remaining_time { (HISTORICAL_REQUESTS_INTERVAL - elapsed_time) };
 
-  QString symbol       = historicalQueue.dequeue();  // Get the next symbol from the queue
-  isFetchingHistorical = true;
+    // Notify in some way, bottom right or left with countdown
+    const qint64 hours { remaining_time / 3600 }, minutes { (remaining_time - hours * 3600) / 60 },
+      seconds { remaining_time - hours * 3600 - minutes * 60 };
+    emit requestRateLimitExceeded(
+      QString("Requested historical data beyond the limit of %1 requests per %2 seconds interval. Time to next "
+              "request: %3 hours %4 minutes and %5 seconds.")
+        .arg(QString::number(MAX_HISTORICAL_REQUESTS_PER_INTERVAL), QString::number(HISTORICAL_REQUESTS_INTERVAL), QString::number(hours),
+             QString::number(minutes), QString::number(seconds)),
+      remaining_time);
+    return;
+  }
+  QString symbol = historicalQueue.dequeue();  // Get the next symbol from the queue
 
   // Use a dummy URL for now. The actual data parsing will be mocked in onNetworkReplyFinished.
   QUrl url(QString("https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=%1&apikey=%2&outputsize=full")
@@ -178,7 +200,13 @@ void StockDataFetcher::processNextRequestHistorical() {
   // request.setAttribute(NoDaysHistoricRequest, QVariant::fromValue(historicalToFetch.second));
 
   manager->get(request);  // Send the GET request
-  historicalRequestTimer->start(HISTORICAL_REQUEST_INTERVAL_MS);
+  lastHistoricalRequests[earliestRequest] = QDateTime::currentSecsSinceEpoch();
+  earliestRequest                         = (earliestRequest + 1) % MAX_HISTORICAL_REQUESTS_PER_INTERVAL;
+  if (!historicalQueue.isEmpty()) {
+    // In case multiple were queued
+    processNextRequestHistorical();
+  }
+  // historicalRequestTimer->start(HISTORICAL_REQUEST_INTERVAL_MS);
 }
 // Slot to handle the network reply when it's finished
 void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
@@ -191,7 +219,6 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
     // Handle network errors (e.g., no internet, host not found, 404, etc.)
     qWarning() << "Network error for" << symbol << ":" << reply->errorString();
     emit fetchError(symbol, reply->errorString());
-
   } else if (statusCode.isValid() && statusCode.toInt() != 200) {
     // HTTP Status Code error (e.g., 404, 401, 429, 500)
     int        httpStatus   = statusCode.toInt();
@@ -204,8 +231,10 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
 
     qWarning() << errorMsg;
     if (httpStatus == 429) {
-      emit requestRateLimitExceeded("API Rate Limit Exceeded. Please wait.");
+      // This should never happen with the timers setup
+      // emit requestRateLimitExceeded("API Rate Limit Exceeded. Please wait.");
       // You might want to re-enqueue the symbol or implement exponential back-off here.
+      qDebug() << "This should never happen(onNetworkReplyFinished, symbol)";
       isFetchingSymbol = true;
       symbolRequestTimer->start(10 * SYMBOL_REQUEST_INTERVAL_MS);
     }
@@ -265,4 +294,31 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
   }
 
   reply->deleteLater();  // Crucial: delete the reply object when done to prevent memory leaks
+}
+
+void StockDataFetcher::loadHistoricalRequestList(QStringList points_list) {
+  for (const QString &item : points_list) {
+    lastHistoricalRequests.append(item.toLongLong());
+  }
+  while (lastHistoricalRequests.size() < MAX_HISTORICAL_REQUESTS_PER_INTERVAL) {
+    lastHistoricalRequests.append(0);
+  }
+  earliestRequest = 0;
+  for (quint64 i = 0; i < MAX_HISTORICAL_REQUESTS_PER_INTERVAL; i++) {
+    if (lastHistoricalRequests.at(i) < lastHistoricalRequests.at(earliestRequest)) {
+      earliestRequest = i;
+      break;
+    }
+  }
+}
+QStringList StockDataFetcher::saveHistoricalRequestList() {
+  QStringList stringed_list;
+  for (const time_record_t point : lastHistoricalRequests) {
+    stringed_list.append(QString::number(point));
+  }
+  return stringed_list;
+}
+
+void StockDataFetcher::onHistoricalRequestTimerTimeout() {
+  processNextRequestHistorical();
 }
