@@ -285,15 +285,17 @@ void MainWindow::onAddStockButtonClicked() {
     // Stock is already in memory
     time_record_t now = QDateTime::currentSecsSinceEpoch();
     if (existingStockPtr->getLastQuoteFetchTime() != 0 && (now - existingStockPtr->getLastQuoteFetchTime()) < QUOTE_CACHE_LIFETIME_SECS) {
-      QMessageBox::information(this, "Data is Fresh", QString("Current quote for '%1' is recent. Not fetching again.").arg(symbol));
+      statusMessage(QString("Current quote for '%1' is recent. Not fetching again.").arg(symbol), 3000);
       displayStockDetails(*existingStockPtr);
       stockSymbolLineEdit->clear();
       return;
     }
-    QMessageBox::information(this, "Fetching Data", QString("Current quote for '%1' is stale. Fetching...").arg(symbol));
+    // QMessageBox::information(this, "Fetching Data", QString("Current quote for '%1' is stale. Fetching...").arg(symbol));
+    statusMessage(QString("Current quote for '%1' is stale. Fetching...").arg(symbol), 500);
   } else {
     // Stock not in memory, fetch it for the first time
-    QMessageBox::information(this, "New Stock", QString("Adding and fetching data for new stock '%1'...").arg(symbol));
+    // QMessageBox::information(this, "New Stock", QString("Adding and fetching data for new stock '%1'...").arg(symbol));
+    statusMessage(QString("Adding and fetching data for new stock '%1'...").arg(symbol), 500);
   }
 
   // Instead of creating a dummy stock, request data from the fetcher
@@ -316,6 +318,7 @@ void MainWindow::onStockListItemClicked(QListWidgetItem *item) {
 
       time_record_t now = QDateTime::currentSecsSinceEpoch();
       if (stock->getLastHistoricalFetchTime() != 0 && now - stock->getLastHistoricalFetchTime() < HISTORICAL_CACHE_LIFETIME_SECS) {
+        statusMessage(QString("Historical data for '%1' is recent. Using cached data.").arg(symbol), 3000);
         qDebug() << "Historical data for" << symbol << "is recent. Using cached data.";
         if (stock->getHistoricalPrices().size() == 0) {
           stock->setHistoricalPrices(dbManager->loadHistoricalPrices(stock->getSymbol()));
@@ -326,7 +329,7 @@ void MainWindow::onStockListItemClicked(QListWidgetItem *item) {
         return;
       }
 
-      qDebug() << "Historical data for" << symbol << "is stale. Fetching...";
+      statusMessage(QString("Historical data for '%1' is stale. Fetching...").arg(symbol), 500);
       QMetaObject::invokeMethod(dataFetcher, "fetchHistoricalData", Qt::QueuedConnection, Q_ARG(QString, symbol));
     }
   }
@@ -400,7 +403,8 @@ void MainWindow::onDeleteStockFromDbClicked(const QString &symbol) {
       }
       // updateStockListDisplay();                                      // Refresh the list if needed
       stockDetailsLabel->setText("Select a stock to see details.");  // Clear details
-      QMessageBox::information(this, "Stock Deleted", QString("Stock '%1' has been permanently deleted.").arg(symbol));
+      // QMessageBox::information(this, "Stock Deleted", QString("Stock '%1' has been permanently deleted.").arg(symbol));
+      statusMessage(QString("Stock '%1' has been permanently deleted.").arg(symbol), 3000);
       qDebug() << "Stock" << symbol << "deleted from DB and RAM.";
     } else {
       QMessageBox::critical(this, "Deletion Error", QString("Failed to delete '%1' from the database.").arg(symbol));
