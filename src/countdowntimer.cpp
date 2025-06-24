@@ -3,16 +3,19 @@
 #include <QDebug>
 
 CountdownTimer::CountdownTimer(QWidget *parent):
-    QWidget(parent), timeLabel(new QLabel("00:00:00", this)), descriptionLabel(new QLabel("Next request in: ", this)),
+    QWidget(parent), timeLabel(new QLabel("00:00:00", this)), descriptionLabel(new QLabel("Next historical data request in: ", this)),
     updateTimer(new QTimer(this)), layout(new QHBoxLayout(this)) {
   // Setup UI
+
+  layout->setAlignment(Qt::AlignVCenter);  // Vertical center alignment
   layout->addWidget(descriptionLabel);
   layout->addWidget(timeLabel);
   layout->setContentsMargins(5, 2, 5, 2);
 
   // Style the labels
-  timeLabel->setStyleSheet("QLabel { font-family: 'Courier New', monospace; font-weight: bold; color: #2E8B57; }");
-  descriptionLabel->setStyleSheet("QLabel { color: #666; }");
+  timeLabel->setStyleSheet(
+    "QLabel { font-family: 'Arial', monospace; font-weight: bold; color: #2E8B57;vertical-align: middle; font-size: 12px; }");
+  descriptionLabel->setStyleSheet("QLabel { font-family: 'Arial', monospace; font-weight: bold;vertical-align: middle;font-size: 12px;  }");
 
   // Setup timer
   updateTimer->setInterval(1000);  // Update every second
@@ -58,7 +61,8 @@ void CountdownTimer::updateDisplay() {
 
   if (remaining <= 0) {
     timeLabel->setText("00:00:00");
-    timeLabel->setStyleSheet("QLabel { font-family: 'Courier New', monospace; font-weight: bold; color: #2E8B57; }");
+    timeLabel->setStyleSheet(
+      "QLabel { font-family: 'Arial', monospace; font-weight: bold; color: #2E8B57;vertical-align: middle;font-size: 12px;  }");
     descriptionLabel->setText("Ready: ");
 
     if (updateTimer->isActive()) {
@@ -70,9 +74,11 @@ void CountdownTimer::updateDisplay() {
       updateTimer->start();
     }
     timeLabel->setText(formatTime(remaining));
-    timeLabel->setStyleSheet("QLabel { font-family: 'Courier New', monospace; font-weight: bold; color: #DC143C; }");
-    descriptionLabel->setText("Next request in: ");
-    descriptionLabel->setStyleSheet("QLabel { font-family: 'Courier New', monospace; font-weight: bold; }");
+    timeLabel->setStyleSheet(
+      "QLabel { font-family: 'Arial', monospace; font-weight: bold; color: #DC143C;vertical-align: middle;font-size: 12px;  }");
+    descriptionLabel->setText("Next historical data request in: ");
+    descriptionLabel->setStyleSheet(
+      "QLabel { font-family: 'Arial', monospace; font-weight: bold;vertical-align: middle;font-size: 12px;  }");
     emit timeUpdated(remaining);
   }
 }

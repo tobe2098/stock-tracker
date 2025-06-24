@@ -32,6 +32,7 @@
 #include "autoscalechartview.hpp"
 #include "countdowntimer.hpp"
 #include "datamanager.hpp"
+#include "downloadprogress.hpp"
 #include "stock.hpp"
 #include "stockdatafetcher.hpp"
 // Define our MainWindow class, inheriting from QMainWindow
@@ -99,8 +100,8 @@ class MainWindow : public QMainWindow {
 
     QPushButton *settingsButton;
 
-    CountdownTimer *rateLimitTimer;
-
+    CountdownTimer       *rateLimitTimer;
+    DownloadStatusWidget *downloadStatus;
     // Settings object
     QSettings *settings;
     // Our new data fetcher instance
@@ -124,7 +125,7 @@ class MainWindow : public QMainWindow {
     void setupPlaceholderChart();
     void setupStockSelector();
     // void createPlaceholderData();
-
+    void   statusMessage(const QString &message, qint64 duration);
     Stock *findStockBySymbol(const QString &symbol);
 };
 

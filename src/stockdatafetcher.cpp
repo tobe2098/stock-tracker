@@ -13,7 +13,7 @@ const QList<QString> api_paths_historical { QStringLiteral("/../../api_historica
 constexpr qint64 MAX_LIMIT_TIMER { 60'000 };
 // Constructor
 StockDataFetcher::StockDataFetcher(QObject *parent):
-    QObject(parent), manager(nullptr),  // 'this' sets StockDataFetcher as parent, handles deletion
+    QObject(parent), manager(nullptr), networkReplies(),  // 'this' sets StockDataFetcher as parent, handles deletion
     symbolRequestTimer(nullptr), isFetchingSymbol(false), keyValidatedQuote(false), keyValidatedHistorical(false) {
   // Connect the finished signal of the manager to our slot
 }
@@ -117,12 +117,12 @@ void StockDataFetcher::fetchHistoricalData(const QString &symbol) {
     emit fetchError(symbol, "Stock symbol cannot be empty.");
     return;
   }
-  if (historicalQueue.contains(symbol)) {
+  if (!historicalQueue.contains(symbol)) {
+    historicalQueue.enqueue(symbol);
+    qDebug() << "Enqueued symbol:" << symbol << ". Queue size:" << symbolQueue.size();
+  } else {
     qDebug() << "Symbol" << symbol << "already in queue.";
-    return;  // Don't add duplicates to the queue if already pending
   }
-  historicalQueue.enqueue(symbol);
-  qDebug() << "Enqueued symbol:" << symbol << ". Queue size:" << symbolQueue.size();
   // If not currently fetching, immediately try to process the next request
   // This allows the first request to go out without waiting for the timer,
   // and subsequent ones will be rate-limited.
@@ -151,15 +151,35 @@ void StockDataFetcher::processNextRequestSymbol() {
   QString symbolToFetch = symbolQueue.dequeue();  // Get the next symbol from the queue
   isFetchingSymbol      = true;
 
+  QString downloadId  = generateDownloadId(symbolToFetch, QuoteRequest);
+  QString description = QString("Quote: %1").arg(symbolToFetch);
+
   // Use a dummy URL for now. The actual data parsing will be mocked in onNetworkReplyFinished.
   QUrl url(QString("https://finnhub.io/api/v1/quote?symbol=%1&token=%2").arg(symbolToFetch).arg(apiKeyQuote));
   qDebug() << "Requesting data for:" << symbolToFetch << "from" << url.toString();
   QNetworkRequest request(url);
   request.setAttribute(RequestTypeAttributeId, QVariant::fromValue(RequestType::QuoteRequest));
+  request.setAttribute(DownloadIdAttribute, downloadId);  // Store download ID in request
   // You might add specific headers if your API requires them, e.g.:
   // request.setRawHeader("X-API-KEY", m_apiKey.toUtf8());
+  QNetworkReply *reply = manager->get(request);
+  // Store download info
+  DownloadInfo downloadInfo;
+  downloadInfo.description = description;
+  downloadInfo.downloadId  = downloadId;
+  networkReplies[reply]    = downloadInfo;
 
-  manager->get(request);  // Send the GET request
+  connect(reply, &QNetworkReply::downloadProgress, this, [this, downloadId](qint64 received, qint64 total) {
+    if (total > 0) {
+      int  percentage = (received * 100) / total;
+      emit progressUpdated(downloadId, percentage);
+    }
+  });
+
+  connect(reply, &QNetworkReply::finished, this, [this, downloadId]() { emit downloadCompleted(downloadId); });
+
+  emit downloadStarted(downloadId, description);
+
   symbolRequestTimer->start(SYMBOL_REQUEST_INTERVAL_MS);
 }
 // New slot to process requests from the queue
@@ -167,9 +187,6 @@ void StockDataFetcher::processNextRequestHistorical() {
   if (historicalQueue.isEmpty()) {
     // Should never happen if properly managed
     qDebug() << "This should not happen (processNextRequestHistorical)";
-    //  qDebug() << "Request queue is empty.";
-    //  Optionally, you might stop the timer here if no more requests are expected for a while
-    //  m_requestTimer->stop();
     return;
   }
   time_record_t elapsed_time { (QDateTime::currentSecsSinceEpoch() - lastHistoricalRequests[earliestRequest]) };
@@ -188,7 +205,9 @@ void StockDataFetcher::processNextRequestHistorical() {
     return;
   }
   QString symbol = historicalQueue.dequeue();  // Get the next symbol from the queue
-
+  // Generate unique download ID
+  QString downloadId  = generateDownloadId(symbol, HistoricalRequest);
+  QString description = QString("Historical: %1").arg(symbol);
   // Use a dummy URL for now. The actual data parsing will be mocked in onNetworkReplyFinished.
   QUrl url(QString("https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=%1&apikey=%2&outputsize=full")
              .arg(symbol, apiKeyHistorical));
@@ -197,9 +216,29 @@ void StockDataFetcher::processNextRequestHistorical() {
   // You might add specific headers if your API requires them, e.g.:
   // request.setRawHeader("X-API-KEY", m_apiKey.toUtf8());
   request.setAttribute(RequestTypeAttributeId, QVariant::fromValue(RequestType::HistoricalRequest));
+  request.setAttribute(DownloadIdAttribute, downloadId);  // Store download ID in request
   // request.setAttribute(NoDaysHistoricRequest, QVariant::fromValue(historicalToFetch.second));
 
-  manager->get(request);  // Send the GET request
+  QNetworkReply *reply = manager->get(request);
+
+  // Store download info
+  DownloadInfo downloadInfo;
+  downloadInfo.description = description;
+  downloadInfo.downloadId  = downloadId;
+  networkReplies[reply]    = downloadInfo;
+  // Connect progress tracking
+  connect(reply, &QNetworkReply::downloadProgress, this, [this, downloadId](qint64 received, qint64 total) {
+    if (total > 0) {
+      int  percentage = (received * 100) / total;
+      emit progressUpdated(downloadId, percentage);
+    }
+  });
+
+  connect(reply, &QNetworkReply::finished, this, [this, downloadId]() { emit downloadCompleted(downloadId); });
+
+  // Emit download started
+  emit downloadStarted(downloadId, description);
+
   lastHistoricalRequests[earliestRequest] = QDateTime::currentSecsSinceEpoch();
   earliestRequest                         = (earliestRequest + 1) % MAX_HISTORICAL_REQUESTS_PER_INTERVAL;
   if (!historicalQueue.isEmpty()) {
@@ -208,8 +247,28 @@ void StockDataFetcher::processNextRequestHistorical() {
   }
   // historicalRequestTimer->start(HISTORICAL_REQUEST_INTERVAL_MS);
 }
+QString StockDataFetcher::generateDownloadId(const QString &symbol, RequestType type) {
+  return QString("%1_%2").arg(symbol).arg(type == QuoteRequest ? "q" : "h");
+}
 // Slot to handle the network reply when it's finished
 void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
+  QString downloadId;
+
+  // Get download ID from the reply
+  if (networkReplies.contains(reply)) {
+    downloadId = networkReplies[reply].downloadId;
+    networkReplies.remove(reply);  // Clean up
+  } else {
+    // Fallback - extract from request attribute
+    QVariant downloadIdVariant = reply->request().attribute(DownloadIdAttribute);
+    if (downloadIdVariant.isValid()) {
+      downloadId = downloadIdVariant.toString();
+    } else {
+      // Generate fallback ID
+      QString symbol = QUrlQuery(reply->url()).queryItemValue("symbol");
+      downloadId     = QString("unknown_%1").arg(symbol);
+    }
+  }
   QString     symbol             = QUrlQuery(reply->url()).queryItemValue("symbol");
   QVariant    statusCode         = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
   QVariant    requestTypeVariant = reply->request().attribute(RequestTypeAttributeId);
@@ -218,6 +277,7 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
   if (reply->error() != QNetworkReply::NoError) {
     // Handle network errors (e.g., no internet, host not found, 404, etc.)
     qWarning() << "Network error for" << symbol << ":" << reply->errorString();
+    emit downloadError(downloadId, reply->errorString());
     emit fetchError(symbol, reply->errorString());
   } else if (statusCode.isValid() && statusCode.toInt() != 200) {
     // HTTP Status Code error (e.g., 404, 401, 429, 500)
@@ -230,6 +290,7 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
                          .arg(QString(responseData));
 
     qWarning() << errorMsg;
+    emit downloadError(downloadId, errorMsg);
     if (httpStatus == 429) {
       // This should never happen with the timers setup
       // emit requestRateLimitExceeded("API Rate Limit Exceeded. Please wait.");

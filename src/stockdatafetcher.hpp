@@ -23,11 +23,18 @@
 #include "stock.hpp"  // Our Stock data model
 
 class StockDataFetcher : public QObject {
-  Q_OBJECT  // Essential for signals and slots
+    Q_OBJECT  // Essential for signals and slots
 
-    public :
-      // Constructor: Takes a parent QObject (usually nullptr if it lives in the main thread)
-      explicit StockDataFetcher(QObject *parent = nullptr);
+      struct DownloadInfo {
+        qint64  received = 0;
+        qint64  total    = 0;
+        QString description;
+        QString downloadId;  // Add this field
+    };
+
+  public:
+    // Constructor: Takes a parent QObject (usually nullptr if it lives in the main thread)
+    explicit StockDataFetcher(QObject *parent = nullptr);
     ~StockDataFetcher();
 
   public slots:
@@ -52,6 +59,11 @@ class StockDataFetcher : public QObject {
     // Signal emitted if there's an error during fetching
     void fetchError(const QString &symbol, const QString &errorString);
     void requestRateLimitExceeded(const QString &message, qint64 remaining_time);  // New signal for rate limit info
+
+    void downloadStarted(const QString &downloadId, const QString &description);
+    void progressUpdated(const QString &downloadId, int percentage);
+    void downloadCompleted(const QString &downloadId);
+    void downloadError(const QString &downloadId, const QString &error);
   private slots:
     // Slot to handle the finished signal from QNetworkAccessManager
     void onNetworkReplyFinished(QNetworkReply *reply);
@@ -59,9 +71,10 @@ class StockDataFetcher : public QObject {
     void requestHistoricalSlot();  // New slot to handle the request queue
 
   private:
-    QNetworkAccessManager *manager;  // The network manager instance
-    QString                apiKeyQuote;
-    QString                apiKeyHistorical;
+    QNetworkAccessManager              *manager;  // The network manager instance
+    QMap<QNetworkReply *, DownloadInfo> networkReplies;
+    QString                             apiKeyQuote;
+    QString                             apiKeyHistorical;
 
     QQueue<QString> symbolQueue;         // Queue of symbols to fetch
     QQueue<QString> historicalQueue;     // New queue for historical requests (symbol, daysBack)
@@ -76,6 +89,7 @@ class StockDataFetcher : public QObject {
     // Static member to hold the custom attribute ID
     const static QNetworkRequest::Attribute RequestTypeAttributeId { QNetworkRequest::Attribute(QNetworkRequest::User + 1) };
     const static QNetworkRequest::Attribute NoDaysHistoricRequest { QNetworkRequest::Attribute(QNetworkRequest::User + 2) };
+    const static QNetworkRequest::Attribute DownloadIdAttribute { QNetworkRequest::Attribute(QNetworkRequest::User + 3) };
 
     bool isFetchingSymbol;  // Flag to prevent multiple simultaneous fetches (if API only allows one at a time)
     bool keyValidatedQuote;
@@ -89,6 +103,7 @@ class StockDataFetcher : public QObject {
       QuoteRequest,
       HistoricalRequest
     };
+    QString generateDownloadId(const QString &symbol, RequestType type);
 };
 
 #endif  // MAINWINDOW_H

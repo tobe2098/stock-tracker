@@ -14,6 +14,8 @@ A stock-tracker using Qt and C++
 - Rate limit calculations, tracking and message to avoid, but override. Doing Partially done, only thing left is what we do with exceeded rate limits.
 - Separate thread for fetching each (reason for queues apart from rate limits). Doing
 - Waiting timer for historical request in bottom left, while the other progress bars are in the right? If possible
+- When writing another historical request to queue and it is stuck in the queue, check if time is gone, if not emit. If time is gone, ignore. DONE
+- Store API keys in settings, dialogue box window to add them when not found at first.
 
 - Load json from API query for history (try to make it a rich query, intra and interday) DONE
 - Review annotations for what can be done (findstock and update without deleting, sorted stocks)

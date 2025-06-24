@@ -90,15 +90,32 @@ MainWindow::MainWindow(QWidget *parent):
   // Create and setup status bar
   QStatusBar *statusBar = this->statusBar();  // This creates the status bar if it doesn't exist
   // Create countdown timer widget
+
+  downloadStatus = new DownloadStatusWidget(this);
   rateLimitTimer = new CountdownTimer(this);
   // Add countdown timer to status bar (permanent widget stays on the right)
+  statusBar->addWidget(downloadStatus);  // LEFT SIDE
   statusBar->addPermanentWidget(rateLimitTimer);
-  statusBar->setSizeGripEnabled(false);
+  // statusBar->setSizeGripEnabled(false);
+  statusBar->setStyleSheet(R"(
+    QStatusBar::item {
+    border: none;
+}
+)");  // This is what works in removing the separators
+  downloadStatus->setStyleSheet(R"(
+  QWidget {
+      background: transparent;
+      border: none;
+      margin: 0px;
+      padding: 0px;
+  }
+)");
+  rateLimitTimer->setStyleSheet("border: none; margin: 0px; padding: 0px;");
   // statusBar->setStyleSheet("QStatusBar { border: none; }");
   // statusBar->setContentsMargins(0, 0, 0, 0);
   // rateLimitTimer->setContentsMargins(0, 0, 0, 0);
   // You can also add temporary messages that appear on the left
-  statusBar->showMessage("Ready", 2000);
+  statusMessage("Ready", 2000);
   // statusBar->setStyleSheet(
   //   "QStatusBar {"
   //   "    background-color: #f0f0f0;"
@@ -167,7 +184,11 @@ MainWindow::MainWindow(QWidget *parent):
   QMetaObject::invokeMethod(dataFetcher, "initialize", Qt::QueuedConnection);
   QMetaObject::invokeMethod(dataFetcher, "loadHistoricalRequestList", Qt::QueuedConnection,
                             Q_ARG(QStringList, settings->value("usageList").toStringList()));
-
+  // Connect the same signals as before:
+  connect(dataFetcher, &StockDataFetcher::downloadStarted, downloadStatus, &DownloadStatusWidget::onDownloadStarted);
+  connect(dataFetcher, &StockDataFetcher::progressUpdated, downloadStatus, &DownloadStatusWidget::onProgressUpdated);
+  connect(dataFetcher, &StockDataFetcher::downloadCompleted, downloadStatus, &DownloadStatusWidget::onDownloadCompleted);
+  connect(dataFetcher, &StockDataFetcher::downloadError, downloadStatus, &DownloadStatusWidget::onDownloadError);
   // Stock chart view connects
   connect(stockChartView, &QChartView::rubberBandChanged, this, [this](QRect rubberBand, QPointF fromScenePoint, QPointF toScenePoint) {
     (void)fromScenePoint;
@@ -516,6 +537,13 @@ void MainWindow::onInvalidStockDataFetched(const QString &error) {
 void MainWindow::onRateLimitExceeded(const QString &message, qint64 remaining_time) {
   QMessageBox::critical(this, "Rate Limit exceeded", message);
   rateLimitTimer->setTargetTime(remaining_time);
+}
+
+void MainWindow::statusMessage(const QString &message, qint64 duration) {
+  QStatusBar *statusBar = this->statusBar();
+  downloadStatus->setVisible(false);
+  statusBar->showMessage(message, duration);
+  QTimer::singleShot(duration, this, [=]() { downloadStatus->setVisible(true); });
 }
 
 // Helper method to find a stock by its symbol in the trackedStocks list

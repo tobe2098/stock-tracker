@@ -24,6 +24,7 @@ set(SOURCES
     src/datamanager.cpp
     src/sliw.cpp
     src/countdowntimer.cpp
+    src/downloadprogress.cpp
     )
 # Set heaeder files
 set(HEADERS
@@ -34,6 +35,7 @@ set(HEADERS
     src/autoscalechartview.hpp
     src/sliw.hpp
     src/countdowntimer.hpp
+    src/downloadprogress.hpp
     )
 
 # Add executable
