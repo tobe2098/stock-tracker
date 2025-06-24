@@ -19,7 +19,7 @@ void DownloadStatusWidget::setupUI() {
 
   summaryLabel = new QLabel("No downloads");
   summaryLabel->setMinimumWidth(120);
-
+  summaryLabel->setVisible(false);
   summaryProgressBar = new QProgressBar();
   summaryProgressBar->setMaximumHeight(14);
   summaryProgressBar->setMaximumWidth(100);
@@ -65,11 +65,13 @@ void DownloadStatusWidget::setupAnimations() {
   });
 }
 void DownloadStatusWidget::updateSummary() {
-  if (totalDownloads == 0) {
-    summaryLabel->setText("Downloads: Ready");
+  if (totalDownloads <= 0) {
+    summaryLabel->setVisible(false);
+    totalDownloads = 0;
     summaryProgressBar->setVisible(false);
     return;
   }
+  summaryLabel->setVisible(true);
 
   // Calculate overall progress
   int totalProgress  = 0;
@@ -100,7 +102,7 @@ void DownloadStatusWidget::updateSummary() {
       summaryLabel->setText(QString("Downloads: %1 errors").arg(errorDownloads));
       summaryLabel->setStyleSheet("QLabel { color: red; }");
     } else {
-      summaryLabel->setText("No downloads");
+      summaryLabel->setText("All downloads finished.");
       summaryLabel->setStyleSheet("");
     }
   }
@@ -116,13 +118,13 @@ void DownloadStatusWidget::createDownloadDisplay(const QString& downloadId, cons
   layout->setSpacing(6);
 
   // Label
-  display.label = new QLabel(description + ":");
+  display.label = new QLabel(description);
   display.label->setMinimumWidth(80);
   display.label->setMaximumWidth(150);
 
   // Progress bar
   display.progressBar = new QProgressBar();
-  display.progressBar->setMaximumHeight(12);
+  display.progressBar->setMaximumHeight(12);  // Slightly taller
   display.progressBar->setMaximumWidth(120);
   display.progressBar->setTextVisible(true);
 
@@ -132,9 +134,26 @@ void DownloadStatusWidget::createDownloadDisplay(const QString& downloadId, cons
 
   display.container->setLayout(layout);
   detailsLayout->addWidget(display.container);
-
+  display.container->setStyleSheet("background: transparent; border: none; margin: 0px; padding: 0px;");
+  display.label->setStyleSheet("background: transparent; border: none; margin: 0px; padding: 0px;");
+  display.progressBar->setStyleSheet(R"(
+    QProgressBar {
+        border: 1px solid #999;
+        border-radius: 4px;
+        background-color: #f0f0f0;  /* Light gray = unfilled portion */
+        text-align: center;
+        color: black;
+    }
+    QProgressBar::chunk {
+        background-color: #4CAF50;  /* Green chunk */
+        width: 1px;
+        margin: 0px;
+        border-radius: 4px;
+    }
+)");
+  display.progressBar->setAlignment(Qt::AlignCenter);
+  display.progressBar->setStyle(QStyleFactory::create("Fusion"));
   downloadDisplays[downloadId] = display;
-  totalDownloads++;
 }
 
 void DownloadStatusWidget::expandDetails() {
@@ -183,10 +202,11 @@ void DownloadStatusWidget::onDownloadStarted(const QString& downloadId, const QS
   display.currentProgress = 0;
   display.container->setVisible(true);
   display.progressBar->setValue(0);
-  display.label->setText(description + ":");
+  display.label->setText(description);
   display.label->setStyleSheet("");
 
   activeDownloads++;
+  totalDownloads++;
   updateSummary();
 }
 void DownloadStatusWidget::onProgressUpdated(const QString& downloadId, int percentage) {
@@ -208,7 +228,7 @@ void DownloadStatusWidget::onDownloadCompleted(const QString& downloadId) {
     completedDownloads++;
 
     // Hide after a brief delay
-    QTimer::singleShot(2000, [this, downloadId]() {
+    QTimer::singleShot(20000, [this, downloadId]() {
       if (downloadDisplays.contains(downloadId)) {
         downloadDisplays[downloadId].container->setVisible(false);
         totalDownloads--;

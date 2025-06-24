@@ -8,6 +8,7 @@
 #include <QProgressBar>
 #include <QPropertyAnimation>
 #include <QString>
+#include <QStyleFactory>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>

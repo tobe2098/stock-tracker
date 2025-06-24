@@ -12,8 +12,8 @@ A stock-tracker using Qt and C++
 
 - Fetching notification only during fetching, not require click. Doing (also notification when deleted, only appear in  the bottom right)
 - Rate limit calculations, tracking and message to avoid, but override. Doing Partially done, only thing left is what we do with exceeded rate limits.
-- Separate thread for fetching each (reason for queues apart from rate limits). Doing
-- Waiting timer for historical request in bottom left, while the other progress bars are in the right? If possible
+- Separate thread for fetching each (reason for queues apart from rate limits) and processing. DONE
+- Waiting timer for historical request in bottom left, while the other progress bars are in the right? If possible NO
 - When writing another historical request to queue and it is stuck in the queue, check if time is gone, if not emit. If time is gone, ignore. DONE
 - Store API keys in settings, dialogue box window to add them when not found at first.
 
