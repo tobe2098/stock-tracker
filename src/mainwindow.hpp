@@ -124,6 +124,11 @@ class MainWindow : public QMainWindow {
 
     void setupPlaceholderChart();
     void setupStockSelector();
+
+    void saveWindowGeometry();
+    void saveHistoricalUsage();
+    void saveSettings();
+    void loadSettings();
     // void createPlaceholderData();
     void   statusMessage(const QString &message, qint64 duration);
     Stock *findStockBySymbol(const QString &symbol);

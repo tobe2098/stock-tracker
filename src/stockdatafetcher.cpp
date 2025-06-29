@@ -7,14 +7,11 @@
 #include <QJsonObject>
 #include <QMessageBox>  // Only for example, you might want to emit errors and handle in UI
 
-const QList<QString> api_paths_quote { QStringLiteral("/../../api_quote.txt"), QStringLiteral("/./api_quote.txt") };
-const QList<QString> api_paths_historical { QStringLiteral("/../../api_historical.txt"), QStringLiteral("/./api_historical.txt") };
-
 constexpr qint64 MAX_LIMIT_TIMER { 60'000 };
 // Constructor
 StockDataFetcher::StockDataFetcher(QObject *parent):
     QObject(parent), manager(nullptr), networkReplies(),  // 'this' sets StockDataFetcher as parent, handles deletion
-    symbolRequestTimer(nullptr), isFetchingSymbol(false), keyValidatedQuote(false), keyValidatedHistorical(false) {
+    symbolRequestTimer(nullptr), isFetchingSymbol(false) {
   // Connect the finished signal of the manager to our slot
 }
 void StockDataFetcher::initialize() {
@@ -30,68 +27,19 @@ void StockDataFetcher::initialize() {
   // Move timer to the new thread
   symbolRequestTimer->start(SYMBOL_REQUEST_INTERVAL_MS);
 }
-void StockDataFetcher::setAPIKeyQuote() {
-  QString key;
-  for (const QString &path : api_paths_quote) {
-    QFile file(QApplication::applicationDirPath() + path);
-    // Try to open the file in read-only mode
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-      qWarning() << "Could not open file for reading:" << file.errorString();
-      continue;
-    }
-
-    // Create a QTextStream associated with the file
-    QTextStream in(&file);
-
-    // Read the entire file content into a QString
-    key = in.readAll();
-    // Close the file (important to release resources)
-    file.close();
-
-    if (key.isEmpty()) {
-      continue;
-    }
-    apiKeyQuote = key;
-    return;
-  }
-  //   emit fetchError("AAPL", "Failed to validate API key");
-}
-void StockDataFetcher::setAPIKeyHistorical() {
-  QString key;
-  for (const QString &path : api_paths_historical) {
-    QFile file(QApplication::applicationDirPath() + path);
-    // Try to open the file in read-only mode
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-      qWarning() << "Could not open file for reading:" << file.errorString();
-      continue;
-    }
-
-    // Create a QTextStream associated with the file
-    QTextStream in(&file);
-
-    // Read the entire file content into a QString
-    key = in.readAll();
-    // Close the file (important to release resources)
-    file.close();
-
-    if (key.isEmpty()) {
-      continue;
-    }
-    apiKeyHistorical = key;
-    return;
-  }
-  //   emit fetchError("AAPL", "Failed to validate API key");
-}
 
 StockDataFetcher::~StockDataFetcher() {
   qDebug() << "StockDataFetcher destroyed.";
   // manager is deleted automatically because it has 'this' as parent.
 }
+void StockDataFetcher::updateQuoteAPIKey(QString key) {
+  apiKeyQuote = key;
+}
+void StockDataFetcher::updateHistoricalAPIKey(QString key) {
+  apiKeyHistorical = key;
+}
 // Slot to initiate a data fetch
 void StockDataFetcher::fetchStockData(const QString &symbol) {
-  if (!keyValidatedQuote) {
-    setAPIKeyQuote();
-  }
   if (symbol.isEmpty()) {
     emit fetchError(symbol, "Stock symbol cannot be empty.");
     return;
@@ -110,9 +58,6 @@ void StockDataFetcher::fetchStockData(const QString &symbol) {
   }
 }
 void StockDataFetcher::fetchHistoricalData(const QString &symbol) {
-  if (!keyValidatedHistorical) {
-    setAPIKeyHistorical();
-  }
   if (symbol.isEmpty()) {
     emit fetchError(symbol, "Stock symbol cannot be empty.");
     return;
@@ -306,7 +251,6 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
     qDebug() << "Received response for" << symbol << ".";  // << responseData.data();
     if (requestType == QuoteRequest) {
       qDebug() << responseData.data();
-      keyValidatedQuote     = true;
       QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
       QJsonObject   jsonObject;
       if (jsonDoc.isObject()) {
@@ -327,7 +271,6 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
         emit invalidStockDataFetched("Network response is not a valid JSON.");
       }
     } else if (requestType == HistoricalRequest) {
-      keyValidatedHistorical = true;
       // --- SIMULATED JSON PARSING FOR HISTORICAL DATA ---
       // In a real app, parse the actual JSON response for historical data
       QMap<time_record_t, HistoricalDataRecord> historicalData;

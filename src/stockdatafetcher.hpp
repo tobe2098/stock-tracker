@@ -50,7 +50,11 @@ class StockDataFetcher : public QObject {
     time_record_t getTimeToNextRequest() const noexcept {
       return HISTORICAL_REQUESTS_INTERVAL - QDateTime::currentSecsSinceEpoch() + lastHistoricalRequests.at(earliestRequest);
     }
-    void onHistoricalRequestTimerTimeout();
+    void    onHistoricalRequestTimerTimeout();
+    QString getQuoteAPIKey() const noexcept { return apiKeyQuote; };
+    QString getHistoricalAPIKey() const noexcept { return apiKeyHistorical; }
+    void    updateQuoteAPIKey(QString key);
+    void    updateHistoricalAPIKey(QString key);
   signals:
     // Signal emitted when stock data is successfully fetched
     void stockDataFetched(const Stock &stock);
@@ -91,11 +95,7 @@ class StockDataFetcher : public QObject {
     const static QNetworkRequest::Attribute NoDaysHistoricRequest { QNetworkRequest::Attribute(QNetworkRequest::User + 2) };
     const static QNetworkRequest::Attribute DownloadIdAttribute { QNetworkRequest::Attribute(QNetworkRequest::User + 3) };
 
-    bool isFetchingSymbol;  // Flag to prevent multiple simultaneous fetches (if API only allows one at a time)
-    bool keyValidatedQuote;
-    bool keyValidatedHistorical;
-    void setAPIKeyQuote();
-    void setAPIKeyHistorical();
+    bool isFetchingSymbol;                // Flag to prevent multiple simultaneous fetches (if API only allows one at a time)
     void processNextRequestSymbol();      // New slot to handle the request queue
     void processNextRequestHistorical();  // New slot to handle the request queue
 
@@ -105,5 +105,4 @@ class StockDataFetcher : public QObject {
     };
     QString generateDownloadId(const QString &symbol, RequestType type);
 };
-
 #endif  // MAINWINDOW_H

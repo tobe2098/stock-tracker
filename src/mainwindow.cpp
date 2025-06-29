@@ -3,8 +3,13 @@
 #include "mainwindow.hpp"  // Include our own header
 // #include <QDate>           // For QDate operations
 // #include <QDateTime>
-#include <QDebug>       // For debugging output (like console.log in JS)
+#include <QCheckBox>
+#include <QDebug>  // For debugging output (like console.log in JS)
+#include <QFont>
+#include <QFormLayout>
+#include <QGroupBox>
 #include <QMessageBox>  // For simple pop-up messages (instead of alert())
+#include <QSpinBox>
 #include <QStringList>
 // Qt Charts specific includes
 #include <QtCharts/QChart>
@@ -84,7 +89,34 @@ MainWindow::MainWindow(QWidget *parent):
   // For simplicity, let's put it below the tabs for now.
   // settingsButton = new QPushButton("&#9881", this);
   settingsButton = new QPushButton("\u2699", this);
+  // settingsButton = new QPushButton("⚙️", this);
+  int buttonSize = 41;  // Choose your size
+  settingsButton->setFixedSize(buttonSize, buttonSize);
+  settingsButton->setStyleSheet(QString("QPushButton {"
+                                        "   border: 1px solid palette(light);"
+                                        "   border-radius: %1px;"  // Half the size for perfect circle
+                                        "   background-color: palette(dark);"
+                                        "   font-size: 22px;"
+                                        "   padding: 0px 1px 2px 2px;"  // top right bottom left
+                                        "   margin-right: 9px;"
+                                        "   margin-bottom: 9px;"
+                                        "   text-align: center;"
+                                        "}"
+                                        "QPushButton:hover {"
+                                        "   background-color: palette(mid);"
+                                        "}"
+                                        "QPushButton:pressed {"
+                                        "   background-color: palette(light);"
+                                        "}")
+                                  .arg((buttonSize - 9) / 2));
+  // QWidget     *buttonContainer = new QWidget(this);
+  // QHBoxLayout *containerLayout = new QHBoxLayout(buttonContainer);
+  // containerLayout->setContentsMargins(0, 5, 5, 5);  // top, left, bottom, right
+  // containerLayout->addWidget(settingsButton);
+
+  // mainTabWidget->setCornerWidget(buttonContainer, Qt::TopRightCorner);
   mainTabWidget->setCornerWidget(settingsButton, Qt::TopRightCorner);
+  // mainTabWidget->tabBar()->setMinimumHeight(50);
   // mainLayout->addWidget(settingsButton);
   // --- Bottom Section: Status Bar ---
   // Create and setup status bar
@@ -115,7 +147,7 @@ MainWindow::MainWindow(QWidget *parent):
   // statusBar->setContentsMargins(0, 0, 0, 0);
   // rateLimitTimer->setContentsMargins(0, 0, 0, 0);
   // You can also add temporary messages that appear on the left
-  statusMessage("Ready", 2000);
+  statusMessage("  Ready", 2000);
   // statusBar->setStyleSheet(
   //   "QStatusBar {"
   //   "    background-color: #f0f0f0;"
@@ -140,6 +172,23 @@ MainWindow::MainWindow(QWidget *parent):
   mainTabWidget->addTab(chartTab, "Stock Chart");
   chart_tab_id = tab_cnt++;
 
+  // Tab widget settings
+  QFont tabFont = mainTabWidget->font();
+  tabFont.setPointSize(tabFont.pointSize() + 2);
+  mainTabWidget->setFont(tabFont);
+  mainTabWidget->tabBar()->setExpanding(true);
+  // mainTabWidget->setStyleSheet(
+  //   "QTabBar::tab {"
+  //   // "height: 50px;"
+  //   // "width: 100px;"
+  //   "border: 1px solid palette(mid);}"  // Only bottom border
+  //   "QTabBar::tab:selected {"
+  //   // "height: 50px;"
+  //   // "width: 100px;"
+  //   "border: 1px solid palette(light);"
+  //   "border-bottom: none;"
+  //   " }");
+
   // --- Data Fetcher Setup ---
   networkThread = new QThread(this);
   dataFetcher   = new StockDataFetcher();  // 'this' sets MainWindow as parent
@@ -154,7 +203,6 @@ MainWindow::MainWindow(QWidget *parent):
   }
   // Settings init
   settings = new QSettings("tobe2098", "stock_tracker", this);
-  this->restoreGeometry(settings->value("windowGeometry").toByteArray());
 
   // --- Signal-Slot Connections ---
   // Connect the 'clicked' signal of the addStockButton to our 'onAddStockButtonClicked' slot.
@@ -182,8 +230,9 @@ MainWindow::MainWindow(QWidget *parent):
   connect(dataFetcher, &StockDataFetcher::requestRateLimitExceeded, this, &MainWindow::onRateLimitExceeded);
   connect(rateLimitTimer, &CountdownTimer::finished, dataFetcher, &StockDataFetcher::onHistoricalRequestTimerTimeout);
   QMetaObject::invokeMethod(dataFetcher, "initialize", Qt::QueuedConnection);
-  QMetaObject::invokeMethod(dataFetcher, "loadHistoricalRequestList", Qt::QueuedConnection,
-                            Q_ARG(QStringList, settings->value("usageList").toStringList()));
+
+  loadSettings();
+
   // Connect the same signals as before:
   connect(dataFetcher, &StockDataFetcher::downloadStarted, downloadStatus, &DownloadStatusWidget::onDownloadStarted);
   connect(dataFetcher, &StockDataFetcher::progressUpdated, downloadStatus, &DownloadStatusWidget::onProgressUpdated);
@@ -237,17 +286,8 @@ MainWindow::MainWindow(QWidget *parent):
 
 // Destructor implementation (empty as Qt's parent-child ownership handles deletion)
 MainWindow::~MainWindow() {
-  QByteArray window_geometry { this->saveGeometry() };
-  settings->setValue("windowGeometry", window_geometry);
-  QStringList request_list;
-  bool        success { QMetaObject::invokeMethod(dataFetcher, "saveHistoricalRequestList", Qt::BlockingQueuedConnection,
-                                                  Q_RETURN_ARG(QStringList, request_list)) };
-  if (success) {
-    settings->setValue("usageList", request_list);
-    // qDebug() << "Got result:" << window_geometry;
-  } else {
-    qDebug() << "Could not get request list.";
-  }
+  saveSettings();
+
   if (networkThread && networkThread->isRunning()) {
     // Request thread to quit
     networkThread->quit();
@@ -470,7 +510,143 @@ void MainWindow::displayStockDetails(const Stock &stock) {
 }
 // ... implement new slots ...
 void MainWindow::onSettingsButtonClicked() {
-  qDebug() << "Settings button clicked!";
+  QDialog settingsDialog(this);
+  settingsDialog.setWindowTitle("Settings");
+  settingsDialog.setModal(true);
+  settingsDialog.resize(720, 480);
+
+  // Create main layout
+  QVBoxLayout *layout = new QVBoxLayout(&settingsDialog);
+
+  // API Keys Section
+  QGroupBox   *apiGroup  = new QGroupBox("API Keys", &settingsDialog);
+  QFormLayout *apiLayout = new QFormLayout(apiGroup);
+
+  // API Key 1
+  QLineEdit *api_key_quote_edit = new QLineEdit(&settingsDialog);
+  api_key_quote_edit->setPlaceholderText("Enter API Key to fetch quotes (finnhub)");
+  api_key_quote_edit->setEchoMode(QLineEdit::Password);
+  QString key_quote;
+  bool success { QMetaObject::invokeMethod(dataFetcher, "getQuoteAPIKey", Qt::BlockingQueuedConnection, Q_RETURN_ARG(QString, key_quote)) };
+  if (success) {
+    api_key_quote_edit->setText(key_quote);  // Show current value
+    // qDebug() << "Got result:" << window_geometry;
+  } else {
+    qDebug() << "Could not get request list.";
+  }
+
+  // Toggle button to show/hide API Key 1
+  QPushButton *toggle_key_quote = new QPushButton("Show", &settingsDialog);
+  toggle_key_quote->setMaximumWidth(60);
+  QHBoxLayout *key1Layout = new QHBoxLayout();
+  key1Layout->addWidget(api_key_quote_edit);
+  key1Layout->addWidget(toggle_key_quote);
+
+  // API Key 2
+  QLineEdit *api_key_historical_edit = new QLineEdit(&settingsDialog);
+  api_key_historical_edit->setPlaceholderText("Enter API Key to fetch historical data(alphavantage)");
+  api_key_historical_edit->setEchoMode(QLineEdit::Password);
+  QString key_historical;
+  success =
+    QMetaObject::invokeMethod(dataFetcher, "getHistoricalAPIKey", Qt::BlockingQueuedConnection, Q_RETURN_ARG(QString, key_historical));
+
+  if (success) {
+    api_key_historical_edit->setText(key_historical);  // Show current value
+    // qDebug() << "Got result:" << window_geometry;
+  } else {
+    qDebug() << "Could not get request list.";
+  }
+
+  // Toggle button to show/hide API Key 2
+  QPushButton *toggle_key_historical = new QPushButton("Show", &settingsDialog);
+  toggle_key_historical->setMaximumWidth(60);
+  QHBoxLayout *key2Layout = new QHBoxLayout();
+  key2Layout->addWidget(api_key_historical_edit);
+  key2Layout->addWidget(toggle_key_historical);
+
+  // Add to form layout
+  apiLayout->addRow("API Key Quotes:", key1Layout);
+  apiLayout->addRow("API Key Historical:", key2Layout);
+
+  // Display current API keys (masked)
+  // QLabel *currentKeys = new QLabel(&settingsDialog);
+  // QString keyDisplay  = "Current Keys:\n";
+  // keyDisplay += "Key 1: " + (key_quote.isEmpty() ? "Not set" : QString("*").repeated(key_quote.length())) + "\n";
+  // keyDisplay += "Key 2: " + (key_historical.isEmpty() ? "Not set" : QString("*").repeated(key_historical.length()));
+  // currentKeys->setText(keyDisplay);
+  // currentKeys->setStyleSheet("QLabel { background-color: palette(dark); padding: 8px; border-radius: 4px; }");
+  // apiLayout->addRow(currentKeys);
+
+  // Other Settings Section
+  QGroupBox   *otherGroup  = new QGroupBox("General Settings", &settingsDialog);
+  QFormLayout *otherLayout = new QFormLayout(otherGroup);
+
+  // QCheckBox *checkBox = new QCheckBox("Enable notifications", &settingsDialog);
+  // checkBox->setChecked(notificationsEnabled);  // Set current value
+
+  // QSpinBox *spinBox = new QSpinBox(&settingsDialog);
+  // spinBox->setRange(1, 100);
+  // spinBox->setValue(maxItems);  // Set current value
+
+  // otherLayout->addRow(checkBox);
+  // otherLayout->addRow("Max items:", spinBox);
+
+  // Add groups to main layout
+  layout->addWidget(apiGroup);
+  layout->addWidget(otherGroup);
+
+  // Buttons
+  QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &settingsDialog);
+
+  // Custom Save button text
+  buttonBox->button(QDialogButtonBox::Save)->setText("Save Settings");
+
+  layout->addWidget(buttonBox);
+
+  // Connect toggle buttons
+  connect(toggle_key_quote, &QPushButton::clicked, [=]() {
+    if (api_key_quote_edit->echoMode() == QLineEdit::Password) {
+      api_key_quote_edit->setEchoMode(QLineEdit::Normal);
+      toggle_key_quote->setText("Hide");
+    } else {
+      api_key_quote_edit->setEchoMode(QLineEdit::Password);
+      toggle_key_quote->setText("Show");
+    }
+  });
+
+  connect(toggle_key_historical, &QPushButton::clicked, [=]() {
+    if (api_key_historical_edit->echoMode() == QLineEdit::Password) {
+      api_key_historical_edit->setEchoMode(QLineEdit::Normal);
+      toggle_key_historical->setText("Hide");
+    } else {
+      api_key_historical_edit->setEchoMode(QLineEdit::Password);
+      toggle_key_historical->setText("Show");
+    }
+  });
+
+  // Connect dialog buttons
+  connect(buttonBox, &QDialogButtonBox::accepted, [=, &settingsDialog] {
+    // Save settings and update main window
+    QString new_quote_key      = api_key_quote_edit->text().trimmed();
+    QString new_key_historical = api_key_historical_edit->text().trimmed();
+    // bool    newNotifications = checkBox->isChecked();
+    // int     newMaxItems      = spinBox->value();
+
+    // Update main window settings
+    QMetaObject::invokeMethod(dataFetcher, "updateQuoteAPIKey", Qt::QueuedConnection, Q_ARG(QString, new_quote_key));
+    QMetaObject::invokeMethod(dataFetcher, "updateHistoricalAPIKey", Qt::QueuedConnection, Q_ARG(QString, new_key_historical));
+    // updateSettingsFromDialog(newKey1, newKey2);
+    saveSettings();
+    settingsDialog.accept();
+
+    // Show confirmation
+    QMessageBox::information(this, "Settings Saved", "Settings have been saved successfully!");
+  });
+
+  connect(buttonBox, &QDialogButtonBox::rejected, &settingsDialog, &QDialog::reject);
+
+  // Execute dialog
+  settingsDialog.exec();
   // Here you would open a settings dialog or change a settings view.
 }
 
@@ -710,6 +886,54 @@ void MainWindow::setupStockSelector() {
     stockSelector->addItem(stock.getSymbol() + " - " + stock.getName(), QVariant::fromValue(stock));
   }
 }
+void MainWindow::saveWindowGeometry() {
+  QByteArray window_geometry { this->saveGeometry() };
+  settings->setValue("windowGeometry", window_geometry);
+}
+void MainWindow::saveHistoricalUsage() {
+  QStringList request_list;
+  bool        success { QMetaObject::invokeMethod(dataFetcher, "saveHistoricalRequestList", Qt::BlockingQueuedConnection,
+                                                  Q_RETURN_ARG(QStringList, request_list)) };
+  if (success) {
+    settings->setValue("usageList", request_list);
+    // qDebug() << "Got result:" << window_geometry;
+  } else {
+    qDebug() << "Could not get request list.";
+  }
+}
+void MainWindow::saveSettings() {
+  saveWindowGeometry();
+  saveHistoricalUsage();
+  QString key_quote;
+  bool success { QMetaObject::invokeMethod(dataFetcher, "getQuoteAPIKey", Qt::BlockingQueuedConnection, Q_RETURN_ARG(QString, key_quote)) };
+  if (success) {
+    settings->setValue("api_key_quote", key_quote);
+    // qDebug() << "Got result:" << window_geometry;
+  } else {
+    qDebug() << "Could not get request list.";
+  }
+  QString key_historical;
+  success =
+    QMetaObject::invokeMethod(dataFetcher, "getHistoricalAPIKey", Qt::BlockingQueuedConnection, Q_RETURN_ARG(QString, key_historical));
+
+  if (success) {
+    settings->setValue("api_key_historical", key_historical);
+    // qDebug() << "Got result:" << window_geometry;
+  } else {
+    qDebug() << "Could not get request list.";
+  }
+}
+void MainWindow::loadSettings() {
+  this->restoreGeometry(settings->value("windowGeometry").toByteArray());
+
+  QMetaObject::invokeMethod(dataFetcher, "loadHistoricalRequestList", Qt::QueuedConnection,
+                            Q_ARG(QStringList, settings->value("usageList").toStringList()));
+  QMetaObject::invokeMethod(dataFetcher, "updateQuoteAPIKey", Qt::QueuedConnection,
+                            Q_ARG(QString, settings->value("api_key_quote").toString()));
+  QMetaObject::invokeMethod(dataFetcher, "updateHistoricalAPIKey", Qt::QueuedConnection,
+                            Q_ARG(QString, settings->value("api_key_historical").toString()));
+}
+
 void MainWindow::onStockSelectionChanged(int index) {
   if (index <= 0) {
     // First item (placeholder) selected or invalid index

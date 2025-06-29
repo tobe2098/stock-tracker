@@ -25,6 +25,21 @@ void DownloadStatusWidget::setupUI() {
   summaryProgressBar->setMaximumWidth(100);
   summaryProgressBar->setTextVisible(true);
   summaryProgressBar->setVisible(false);
+  summaryProgressBar->setStyleSheet(R"(
+    QProgressBar {
+        border: 1px solid #999;
+        border-radius: 4px;
+        background-color: #f0f0f0;  /* Light gray = unfilled portion */
+        text-align: center;
+        color: black;
+    }
+    QProgressBar::chunk {
+        background-color: #4CAF50;  /* Green chunk */
+        width: 1px;
+        margin: 0px;
+        border-radius: 4px;
+    }
+)");
 
   summaryLayout->addWidget(summaryLabel);
   summaryLayout->addWidget(summaryProgressBar);
