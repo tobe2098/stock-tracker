@@ -25,6 +25,7 @@ set(SOURCES
     src/sliw.cpp
     src/countdowntimer.cpp
     src/downloadprogress.cpp
+    src/heatmappainter.cpp
     )
 # Set heaeder files
 set(HEADERS
@@ -36,6 +37,7 @@ set(HEADERS
     src/sliw.hpp
     src/countdowntimer.hpp
     src/downloadprogress.hpp
+    src/heatmappainter.hpp
     )
 
 # Add executable

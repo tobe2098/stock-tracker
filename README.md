@@ -15,12 +15,14 @@ A stock-tracker using Qt and C++
 - Separate thread for fetching each (reason for queues apart from rate limits) and processing. DONE
 - Waiting timer for historical request in bottom left, while the other progress bars are in the right? If possible NO
 - When writing another historical request to queue and it is stuck in the queue, check if time is gone, if not emit. If time is gone, ignore. DONE
-- Store API keys in settings, dialogue box window (settings) to add them when not found at first. Move the key code to mainwindow, and to the datafetcher we just give the keys directly. 
-- When clock counter is 0, it should show how many requests we have left.
+- Store API keys in settings, dialogue box window (settings) to add them when not found at first. Move the key code to mainwindow, and to the datafetcher we just give the keys directly. DONE
+- Settings functional for api keys for now. DONE
+- Semi Frequent storage of settings. DONE
+  
+- Heatmap fetch all quotes at startup
 
-- Heatmap
-- Settings functional for api keys for now.
-- Semi Frequent storage of settings.
+- When clock counter is 0, it should show how many requests we have left.
+- Settings for window dimensions.
 - Load json from API query for history (try to make it a rich query, intra and interday) DONE
 - Review annotations for what can be done (findstock and update without deleting, sorted stocks)
 - Graph button for
@@ -44,3 +46,11 @@ A stock-tracker using Qt and C++
 
 - Dragging items in the list, changing order and sorting options
 - Delete "Select a stock..." When at least one exists.
+
+# Installation instructions
+
+1. Install Qt-core, Qt-network in your OS. Make sure the paths are available to CMake (PATH variable).
+2. Run cmake
+3. Obtain free API keys from alphavantage and finnhub.
+4. Run the program and put the keys in the boxes.
+5. Now you can enjoy using the program to see stock data and stock plots, as well as the starting heatmap.

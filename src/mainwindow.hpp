@@ -3,6 +3,8 @@
 #ifndef _MAINWINDOW_HEADER
 #define _MAINWINDOW_HEADER
 
+#define QT_BEARER_POLL_TIMEOUT -1
+
 // Include necessary Qt base classes
 #include <QMainWindow>
 // Include specific UI widgets we plan to use
@@ -33,6 +35,7 @@
 #include "countdowntimer.hpp"
 #include "datamanager.hpp"
 #include "downloadprogress.hpp"
+#include "heatmappainter.hpp"
 #include "stock.hpp"
 #include "stockdatafetcher.hpp"
 // Define our MainWindow class, inheriting from QMainWindow
@@ -98,6 +101,8 @@ class MainWindow : public QMainWindow {
     QComboBox  *stockSelector;
     bool        hasPlaceholderChart;
 
+    HeatmapPainter *heatmapWidget;  // New member for heatmap widget
+
     QPushButton *settingsButton;
 
     CountdownTimer       *rateLimitTimer;
@@ -121,6 +126,7 @@ class MainWindow : public QMainWindow {
     void updateStockListDisplay();
     void displayStockDetails(const Stock &stock);
     void updateChart(const Stock &stock);  // New private helper to draw/update chart
+    void updateHeatmap();                  // New helper to update the heatmap
 
     void setupPlaceholderChart();
     void setupStockSelector();
@@ -129,6 +135,8 @@ class MainWindow : public QMainWindow {
     void saveHistoricalUsage();
     void saveSettings();
     void loadSettings();
+
+    void loadAllHistoricalData();
     // void createPlaceholderData();
     void   statusMessage(const QString &message, qint64 duration);
     Stock *findStockBySymbol(const QString &symbol);

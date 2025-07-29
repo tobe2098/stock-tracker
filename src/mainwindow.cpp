@@ -56,7 +56,10 @@ MainWindow::MainWindow(QWidget *parent):
   QVBoxLayout *stockListLayout = new QVBoxLayout(stockListTab);
 
   // For now, let's just add a placeholder for a heatmap tab.
-  heatmapTab = new QWidget(this);
+  heatmapTab                 = new QWidget(this);
+  QVBoxLayout *heatmapLayout = new QVBoxLayout(heatmapTab);
+  heatmapWidget              = new HeatmapPainter(this);  // Initialize HeatmapWidget
+  heatmapLayout->addWidget(heatmapWidget);
   mainTabWidget->addTab(heatmapTab, "Heatmap");
   heatmap_tab_id = tab_cnt++;
   // Instantiate QLineEdit for stock symbol input
@@ -260,6 +263,7 @@ MainWindow::MainWindow(QWidget *parent):
 
   hasPlaceholderChart = true;
   updateStockListDisplay();
+  updateHeatmap();
   // Only way that seems to work is setting a timer.
   QTimer::singleShot(0, this, [this]() {
     QByteArray savedGeometry = settings->value("windowGeometry").toByteArray();
@@ -407,6 +411,7 @@ void MainWindow::onRemoveStockFromRamClicked(const QString &symbol) {
       // updateStockListDisplay();                                      // Refresh the list if needed (though direct removal might be
       // faster)
       stockDetailsLabel->setText("Select a stock to see details.");  // Clear details
+      updateHeatmap();                                               // Update heatmap after removal
       qDebug() << "Stock" << symbol << "removed from RAM.";
     }
   }
@@ -445,6 +450,7 @@ void MainWindow::onDeleteStockFromDbClicked(const QString &symbol) {
       stockDetailsLabel->setText("Select a stock to see details.");  // Clear details
       // QMessageBox::information(this, "Stock Deleted", QString("Stock '%1' has been permanently deleted.").arg(symbol));
       statusMessage(QString("Stock '%1' has been permanently deleted.").arg(symbol), 3000);
+      updateHeatmap();  // Update heatmap after deletion
       qDebug() << "Stock" << symbol << "deleted from DB and RAM.";
     } else {
       QMessageBox::critical(this, "Deletion Error", QString("Failed to delete '%1' from the database.").arg(symbol));
@@ -492,7 +498,7 @@ void MainWindow::displayStockDetails(const Stock &stock) {
                       "<b>Name:</b> %2<br>"
                       "<b>Current Price:</b> $%3<br>"
                       "<b>Price Change:</b> $%4 (<span style='color:%6;'>%5%</span>)<br>"  // Added color for change
-                      "<b>Previous day close:</b> $%7, <b>Day open</b>: $%8, <b>O/N change:</b>(<span style='color:%13;'> %9%</span>)<br>"
+                      "<b>Previous day close:</b> $%7, <b>Day open</b>: $%8, <b>O/N change: </b><span style='color:%13;'> %9%</span><br>"
                       "<b>Day high:</b> $%10, <b>Day low:</b> $%11, <b>Span:</b> %12%"
                       //   "<b>Time and date of record:</b> %13"
                       )
@@ -544,7 +550,7 @@ void MainWindow::onSettingsButtonClicked() {
 
   // API Key 2
   QLineEdit *api_key_historical_edit = new QLineEdit(&settingsDialog);
-  api_key_historical_edit->setPlaceholderText("Enter API Key to fetch historical data(alphavantage)");
+  api_key_historical_edit->setPlaceholderText("Enter API Key to fetch historical data (alphavantage)");
   api_key_historical_edit->setEchoMode(QLineEdit::Password);
   QString key_historical;
   success =
@@ -657,6 +663,14 @@ void MainWindow::onChartDataUpdated(const QList<QPair<qint64, double>> &historic
 }
 
 void MainWindow::onTabChanged(int index) {
+  if (mainTabWidget->tabText(index) == "Stock Heatmap") {
+    updateHeatmap();  // Ensure heatmap is updated when its tab is selected
+  } else if (mainTabWidget->tabText(index) == "Stock Chart") {
+    loadAllHistoricalData();
+    // If you want to auto-display chart of selected stock when tab is changed
+    // you'd need to remember the last selected stock and call updateChart.
+    // For now, it updates when stock list item is clicked.
+  }
   qDebug() << "Tab changed to index:" << index << " (" << mainTabWidget->tabText(index) << ")";
   // You can add logic here to load/refresh data specific to the selected tab.
 }
@@ -685,6 +699,7 @@ void MainWindow::onStockDataFetched(const Stock &stock) {
 
   updateStockListDisplay();               // Refresh the list widget
   displayStockDetails(fetchedStockCopy);  // Display details of the newly fetched/updated stock
+  updateHeatmap();
 }
 // New slot for historical data fetched
 void MainWindow::onHistoricalDataFetched(const QString &symbol, const QMap<time_record_t, HistoricalDataRecord> &historicalData) {
@@ -826,6 +841,11 @@ void MainWindow::updateChart(const Stock &stock) {
   stockChartView->chart()->setTheme(QChart::ChartThemeDark);  // Optional: apply a theme
 }
 
+void MainWindow::updateHeatmap() {
+  std::sort(trackedStocks.begin(), trackedStocks.end(), [](const Stock &a, const Stock &b) { return a.getSymbol() < b.getSymbol(); });
+  heatmapWidget->setStocks(trackedStocks);
+}
+
 void MainWindow::setupPlaceholderChart() {
   // Create the placeholder chart
   QChart *chart = stockChartView->chart();
@@ -932,6 +952,15 @@ void MainWindow::loadSettings() {
                             Q_ARG(QString, settings->value("api_key_quote").toString()));
   QMetaObject::invokeMethod(dataFetcher, "updateHistoricalAPIKey", Qt::QueuedConnection,
                             Q_ARG(QString, settings->value("api_key_historical").toString()));
+}
+
+void MainWindow::loadAllHistoricalData() {
+  for (Stock &stock : trackedStocks) {
+    if (stock.getLastHistoricalFetchTime() != 0 && stock.getHistoricalPrices().isEmpty()) {
+      stock.setHistoricalPrices(dbManager->loadHistoricalPrices(stock.getSymbol()));
+    }
+  }
+  setupStockSelector();
 }
 
 void MainWindow::onStockSelectionChanged(int index) {
