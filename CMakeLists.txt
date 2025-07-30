@@ -46,6 +46,12 @@ add_executable(stock-tracker ${SOURCES} ${HEADERS})
 # Include directory
 target_include_directories(stock-tracker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+qt_add_resources(stock-tracker "resources"
+    PREFIX "/"
+    FILES
+        # images/logo.png
+        images/logo.ico
+)
 
 # Link libraries
 target_link_libraries(stock-tracker PRIVATE 

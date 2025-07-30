@@ -161,21 +161,39 @@ void HeatmapPainter::drawHeatmapStripAlgorithmForward(QPainter *painter, const Q
 
 QColor HeatmapPainter::getColorForChange(double priceChange) const {
   if (priceChange > 0) {
-    // Green shades for positive change
-    int green = 255;
-    int red   = 0;
-    int blue  = 0;
-    // Make it lighter for smaller changes, darker for larger changes
-    // Max change for full saturation could be 10% (adjust as needed)
-    int intensity = qMin(255, (int)(priceChange * 25));  // Scale 0-10% change to 0-255 intensity
-    return QColor(red, green - intensity, blue);         // Fade towards yellow/white for smaller changes
+    // Transition: Grey -> Dark Green -> Bright Green
+    double absChange = priceChange;
+
+    if (absChange <= 0.5) {                           // 0-0.5%: Grey to Dark Green
+      int intensity = (int)(absChange * 200 / 0.5);   // 0-200 intensity
+      int red       = 150 - (150 * intensity / 200);  // 150 -> 0
+      int green     = 150 - (50 * intensity / 200);   // 150 -> 100 (dark green)
+      int blue      = 150 - (150 * intensity / 200);  // 150 -> 0
+      return QColor(red, green, blue);
+    } else {                                                            // 0.5-5%+: Dark Green to Bright Green
+      int intensity = qMin(255, (int)((absChange - 0.5) * 255 / 4.5));  // 0-255 intensity
+      int red       = 0;
+      int green     = 100 + (155 * intensity / 255);  // 100 -> 255 (dark to bright green)
+      int blue      = 0;
+      return QColor(red, green, blue);
+    }
   } else if (priceChange < 0) {
-    // Red shades for negative change
-    int red       = 255;
-    int green     = 0;
-    int blue      = 0;
-    int intensity = qMin(255, (int)(qAbs(priceChange) * 25));  // Scale 0-10% change to 0-255 intensity
-    return QColor(red, green, blue + intensity);               // Fade towards purple/white for smaller changes
+    // Transition: Grey -> Bright Red -> Dark Red
+    double absChange = -(priceChange);
+
+    if (absChange <= 0.5) {                           // 0-0.5%: Grey to Bright Red
+      int intensity = (int)(absChange * 200 / 0.5);   // 0-200 intensity
+      int red       = 150 + (105 * intensity / 200);  // 150 -> 255 (bright red)
+      int green     = 150 - (150 * intensity / 200);  // 150 -> 0
+      int blue      = 150 - (150 * intensity / 200);  // 150 -> 0
+      return QColor(red, green, blue);
+    } else {                                                            // 0.5-5%+: Bright Red to Dark Red
+      int intensity = qMin(255, (int)((absChange - 0.5) * 255 / 4.5));  // 0-255 intensity
+      int red       = 255 - (125 * intensity / 255);                    // 255 -> 130 (bright to dark red)
+      int green     = 0;
+      int blue      = 0;
+      return QColor(red, green, blue);
+    }
   } else {
     // Grey for no change
     return QColor(150, 150, 150);

@@ -26,7 +26,7 @@ MainWindow::MainWindow(QWidget *parent):
     QMainWindow(parent)  // Call the base class constructor
 {
   // Set the window title and initial size
-  setWindowTitle("Stock Tracker");
+  setWindowTitle("tobe's Stock Tracker");
 
   // --- UI Setup ---
 
@@ -284,6 +284,23 @@ MainWindow::MainWindow(QWidget *parent):
     rateLimitTimer->setTargetTime(remaining_time);
     // QMetaObject::invokeMethod(rateLimitTimer, "setTargetTime", Qt::QueuedConnection, Q_ARG(qint64, remaining_time));//Has to be declared
     // as a stop
+  });
+  QTimer::singleShot(0, this, [this]() {
+    for (const Stock &stock : trackedStocks) {
+      time_record_t now = QDateTime::currentSecsSinceEpoch();
+      if (stock.getLastQuoteFetchTime() != 0 && (now - stock.getLastQuoteFetchTime()) < QUOTE_CACHE_LIFETIME_SECS) {
+        statusMessage(QString("Current quote for '%1' is recent. Not fetching again.").arg(stock.getSymbol()), 3000);
+        continue;
+      }
+      // QMessageBox::information(this, "Fetching Data", QString("Current quote for '%1' is stale. Fetching...").arg(symbol));
+      statusMessage(QString("Current quote for '%1' is stale. Fetching...").arg(stock.getSymbol()), 500);
+      // Stock not in memory, fetch it for the first time
+      // QMessageBox::information(this, "New Stock", QString("Adding and fetching data for new stock '%1'...").arg(symbol));
+      // statusMessage(QString("Adding and fetching data for new stock '%1'...").arg(stock.getSymbol()), 500);
+
+      // Instead of creating a dummy stock, request data from the fetcher
+      QMetaObject::invokeMethod(dataFetcher, "fetchStockData", Qt::QueuedConnection, Q_ARG(QString, stock.getSymbol()));
+    }
   });
   //   dataFetcher->setAPIKey();
 }
