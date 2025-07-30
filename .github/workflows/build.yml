@@ -169,7 +169,7 @@ jobs:
 
         # Create distribution folder
         mkdir ..\dist
-        xcopy /E /I .\build\bin\Release ..\dist\StockTracker\
+        xcopy /E /I .\bin\Release ..\dist\StockTracker\
       shell: pwsh
     - name: Verify Qt DLLs copied
       if: matrix.os == 'windows-latest'
