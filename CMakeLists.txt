@@ -42,6 +42,7 @@ set(HEADERS
     src/downloadprogress.hpp
     src/heatmappainter.hpp
     )
+# add_executable(stock-tracker ${SOURCES} ${HEADERS})
 
 # Add executable with platform-specific properties
 if(APPLE)

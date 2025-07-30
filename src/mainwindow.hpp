@@ -100,7 +100,7 @@ class MainWindow : public QMainWindow {
 
     QChartView *stockChartView;
     QComboBox  *stockSelector;
-    bool        hasPlaceholderChart;
+    bool        hasOneStocksData;
 
     HeatmapPainter *heatmapWidget;  // New member for heatmap widget
 

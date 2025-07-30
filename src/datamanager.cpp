@@ -252,7 +252,7 @@ QMap<time_record_t, HistoricalDataRecord> DatabaseManager::loadHistoricalPrices(
   if (query.exec()) {
     while (query.next()) {
       historicalData.insert(query.value("timestamp").toLongLong(),
-                            { query.value("day_high").toDouble(), query.value("day_low").toDouble(), query.value("day_open").toDouble(),
+                            { query.value("day_open").toDouble(), query.value("day_high").toDouble(), query.value("day_low").toDouble(),
                               query.value("day_close").toDouble(), query.value("volume").toLongLong() });
     }
     qDebug() << "Loaded" << historicalData.size() << "historical prices for" << symbol;

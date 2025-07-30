@@ -12,7 +12,7 @@ struct HistoricalDataRecord {
     price_t  open {};
     price_t  close {};
     volume_t volume {};
-    HistoricalDataRecord(price_t high, price_t low, price_t open, price_t close, volume_t volume):
+    HistoricalDataRecord(price_t open, price_t high, price_t low, price_t close, volume_t volume):
         high(high), low(low), open(open), close(close), volume(volume) { }
 };
 

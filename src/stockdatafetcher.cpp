@@ -154,7 +154,7 @@ void StockDataFetcher::processNextRequestHistorical() {
   QString downloadId  = generateDownloadId(symbol, HistoricalRequest);
   QString description = QString("Historical: %1").arg(symbol);
   // Use a dummy URL for now. The actual data parsing will be mocked in onNetworkReplyFinished.
-  QUrl url(QString("https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=%1&apikey=%2&outputsize=full")
+  QUrl url(QString("https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&interval=60min&symbol=%1&apikey=%2&outputsize=full")
              .arg(symbol, apiKeyHistorical));
   qDebug() << "Requesting data for:" << symbol << "from" << url.toString();
   QNetworkRequest request(url);
@@ -278,12 +278,12 @@ void StockDataFetcher::onNetworkReplyFinished(QNetworkReply *reply) {
       QJsonObject                               rootObj;
       if (jsonDoc.isObject()) {
         rootObj                   = jsonDoc.object();
-        QJsonObject timeSeriesObj = rootObj["Time Series (Daily)"].toObject();
+        QJsonObject timeSeriesObj = rootObj["Time Series (60min)"].toObject();
         // We assume the stock exists because it has to be in the list for it to be clicked for the request
         for (auto it = timeSeriesObj.begin(); it != timeSeriesObj.end(); ++it) {
           // qDebug() << it.value().toString();
           QJsonObject   dayData           = it.value().toObject();
-          time_record_t secondsSinceEpoch = QDateTime::fromString(it.key(), "yyyy-MM-dd").toSecsSinceEpoch();
+          time_record_t secondsSinceEpoch = QDateTime::fromString(it.key(), "yyyy-MM-dd hh:mm:ss").toSecsSinceEpoch();
           // Debug the actual data we're parsing
           historicalData.insert(secondsSinceEpoch, { dayData["1. open"].toString().toDouble(), dayData["2. high"].toString().toDouble(),
                                                      dayData["3. low"].toString().toDouble(), dayData["4. close"].toString().toDouble(),

@@ -1,11 +1,12 @@
 #ifndef _AUTOSCALE_HEADER_
 #define _AUTOSCALE_HEADER_
 
+#include <QCandleStickSeries>
+#include <QCandleStickSet>
 #include <QChart>
 #include <QChartView>
 #include <QDateTime>
 #include <QDateTimeAxis>
-#include <QLineSeries>
 #include <QMouseEvent>
 #include <QValueAxis>
 #include <QWheelEvent>
@@ -126,21 +127,35 @@ class AutoScaleChartView : public QChartView {
         return QPair<QDateTime, QDateTime>();
       }
 
-      QLineSeries *series = qobject_cast<QLineSeries *>(seriesList.first());
-      if (!series) {
-        return QPair<QDateTime, QDateTime>();
+      QAbstractSeries *abstractSeries = seriesList.first();
+
+      // Handle LineSeries
+      // if (QLineSeries *lineSeries = qobject_cast<QLineSeries *>(abstractSeries)) {
+      //   QList<QPointF> points = lineSeries->points();
+      //   if (points.isEmpty()) {
+      //     return QPair<QDateTime, QDateTime>();
+      //   }
+
+      //   qint64 minTime = (qint64)points.first().x();
+      //   qint64 maxTime = (qint64)points.last().x();
+
+      //   return QPair<QDateTime, QDateTime>(QDateTime::fromMSecsSinceEpoch(minTime), QDateTime::fromMSecsSinceEpoch(maxTime));
+      // }
+
+      // Handle CandlestickSeries
+      if (QCandlestickSeries *candleSeries = qobject_cast<QCandlestickSeries *>(abstractSeries)) {
+        QList<QCandlestickSet *> sets = candleSeries->sets();
+        if (sets.isEmpty()) {
+          return QPair<QDateTime, QDateTime>();
+        }
+
+        qint64 minTime = (qint64)sets.first()->timestamp();
+        qint64 maxTime = (qint64)sets.last()->timestamp();
+
+        return QPair<QDateTime, QDateTime>(QDateTime::fromMSecsSinceEpoch(minTime), QDateTime::fromMSecsSinceEpoch(maxTime));
       }
 
-      QList<QPointF> points = series->points();
-      if (points.isEmpty()) {
-        return QPair<QDateTime, QDateTime>();
-      }
-
-      // Assuming points are ordered chronologically, just take first and last
-      qint64 minTime = (qint64)points.first().x();
-      qint64 maxTime = (qint64)points.last().x();
-
-      return QPair<QDateTime, QDateTime>(QDateTime::fromMSecsSinceEpoch(minTime), QDateTime::fromMSecsSinceEpoch(maxTime));
+      return QPair<QDateTime, QDateTime>();
     }
 
     void constrainToBounds(QDateTime &newMin, QDateTime &newMax, const QPair<QDateTime, QDateTime> &dataBounds) {
@@ -182,11 +197,6 @@ class AutoScaleChartView : public QChartView {
         return;
       }
 
-      QLineSeries *series = qobject_cast<QLineSeries *>(seriesList.first());
-      if (!series) {
-        return;
-      }
-
       QDateTimeAxis *xAxis = qobject_cast<QDateTimeAxis *>(chart()->axes(Qt::Horizontal).first());
       QValueAxis    *yAxis = qobject_cast<QValueAxis *>(chart()->axes(Qt::Vertical).first());
 
@@ -203,13 +213,31 @@ class AutoScaleChartView : public QChartView {
       double maxY           = std::numeric_limits<double>::lowest();
       bool   hasVisibleData = false;
 
-      QList<QPointF> points = series->points();
-      for (const QPointF &point : points) {
-        qint64 pointTime = (qint64)point.x();
-        if (pointTime >= minTime && pointTime <= maxTime) {
-          minY           = qMin(minY, point.y());
-          maxY           = qMax(maxY, point.y());
-          hasVisibleData = true;
+      QAbstractSeries *abstractSeries = seriesList.first();
+
+      // Handle LineSeries
+      // if (QLineSeries *lineSeries = qobject_cast<QLineSeries *>(abstractSeries)) {
+      //   QList<QPointF> points = lineSeries->points();
+      //   for (const QPointF &point : points) {
+      //     qint64 pointTime = (qint64)point.x();
+      //     if (pointTime >= minTime && pointTime <= maxTime) {
+      //       minY           = qMin(minY, point.y());
+      //       maxY           = qMax(maxY, point.y());
+      //       hasVisibleData = true;
+      //     }
+      //   }
+      // }
+
+      // Handle CandlestickSeries
+      if (QCandlestickSeries *candleSeries = qobject_cast<QCandlestickSeries *>(abstractSeries)) {
+        QList<QCandlestickSet *> sets = candleSeries->sets();
+        for (QCandlestickSet *set : sets) {
+          qint64 setTime = (qint64)set->timestamp();
+          if (setTime >= minTime && setTime <= maxTime) {
+            minY           = qMin(minY, set->low());
+            maxY           = qMax(maxY, set->high());
+            hasVisibleData = true;
+          }
         }
       }
 

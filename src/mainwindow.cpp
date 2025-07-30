@@ -13,11 +13,12 @@
 #include <QSpinBox>
 #include <QStringList>
 // Qt Charts specific includes
+#include <QtCharts/QCandlestickSeries>
+#include <QtCharts/QCandlestickSet>
 #include <QtCharts/QChart>
 #include <QtCharts/QChartView>
 #include <QtCharts/QDateTimeAxis>  // For date axis
-#include <QtCharts/QLineSeries>
-#include <QtCharts/QValueAxis>  // For value axis
+#include <QtCharts/QValueAxis>     // For value axis
 
 #include <QCoreApplication>  // Needed for QCoreApplication::applicationDirPath()
 #include "sliw.hpp"
@@ -179,10 +180,11 @@ MainWindow::MainWindow(QWidget *parent):
   //   "    border: none;"
   //   "}");
   // --- Stock Chart Tab Setup ---
-  chartTab                    = new QWidget(this);
-  QVBoxLayout *chartLayout    = new QVBoxLayout(chartTab);
-  stockChartView              = new AutoScaleChartView(this);  // Initialize QChartView
-  stockSelector               = new QComboBox();
+  chartTab                 = new QWidget(this);
+  QVBoxLayout *chartLayout = new QVBoxLayout(chartTab);
+  stockChartView           = new AutoScaleChartView(this);  // Initialize QChartView
+  stockSelector            = new QComboBox();
+  stockSelector->setMinimumWidth(100);
   QHBoxLayout *selectorLayout = new QHBoxLayout();
   QLabel      *selectorLabel  = new QLabel("Stock:");
   selectorLayout->addWidget(selectorLabel);
@@ -278,9 +280,9 @@ MainWindow::MainWindow(QWidget *parent):
   }
   trackedStocks = dbManager->loadAllStocks();
   setupPlaceholderChart();
+  hasOneStocksData = false;
   setupStockSelector();
 
-  hasPlaceholderChart = true;
   updateStockListDisplay();
   updateHeatmap();
   // Only way that seems to work is setting a timer.
@@ -436,7 +438,8 @@ void MainWindow::onRemoveStockFromRamClicked(const QString &symbol) {
       // updateStockListDisplay();                                      // Refresh the list if needed (though direct removal might be
       // faster)
       stockDetailsLabel->setText("Select a stock to see details.");  // Clear details
-      updateHeatmap();                                               // Update heatmap after removal
+      setupStockSelector();
+      updateHeatmap();  // Update heatmap after removal
       qDebug() << "Stock" << symbol << "removed from RAM.";
     }
   }
@@ -475,6 +478,7 @@ void MainWindow::onDeleteStockFromDbClicked(const QString &symbol) {
       stockDetailsLabel->setText("Select a stock to see details.");  // Clear details
       // QMessageBox::information(this, "Stock Deleted", QString("Stock '%1' has been permanently deleted.").arg(symbol));
       statusMessage(QString("Stock '%1' has been permanently deleted.").arg(symbol), 3000);
+      setupStockSelector();
       updateHeatmap();  // Update heatmap after deletion
       qDebug() << "Stock" << symbol << "deleted from DB and RAM.";
     } else {
@@ -769,6 +773,7 @@ void MainWindow::onHistoricalDataFetched(const QString &symbol, const QMap<time_
     dbManager->updateHistoricalPrices(symbol, historicalData);
     // Also update the stock's last_historical_fetch_time in the main stocks table
     dbManager->addOrUpdateStock(*stock);  // This will update the fetch time
+    hasOneStocksData = true;
     setupStockSelector();
   } else {
     qWarning() << "Received historical data for unknown stock:" << symbol;
@@ -825,16 +830,47 @@ void MainWindow::updateChart(const Stock &stock) {
     chart->removeAxis(axis);
   }
   // Create a line series
-  QLineSeries *series = new QLineSeries();
-  series->setName(stock.getSymbol());  // Name the series
-
+  QCandlestickSeries *series = new QCandlestickSeries();
+  series->setName(stock.getSymbol());             // Name the series
+  series->setIncreasingColor(QColor(Qt::green));  // Color for days where close > open
+  series->setDecreasingColor(QColor(Qt::red));    // Color for days where close < open
+  series->setBodyWidth(0.8);
   // Add data points to the series
   // QMap is sorted by key (QDate), so iterating gives chronological order
   for (auto it = stock.getHistoricalPrices().constBegin(); it != stock.getHistoricalPrices().constEnd(); ++it) {
     // Convert QDate to QDateTime and then to milliseconds since epoch for QPointF
-    series->append(it.key() * 1000, it.value().close);
-  }
+    const time_record_t        &date   = it.key();
+    const HistoricalDataRecord &record = it.value();
 
+    // Create a candlestick set:
+    // Arguments: open, high, low, close, timestamp (in ms since epoch)
+    bool isValid = true;
+    if (record.high < record.low) {
+      qDebug() << "ERROR: High < Low at" << QDateTime::fromSecsSinceEpoch(date).toString();
+      qDebug() << "  High:" << record.high << "Low:" << record.low;
+      isValid = false;
+    }
+    if (record.open < record.low || record.open > record.high) {
+      qDebug() << "ERROR: Open outside range at" << QDateTime::fromSecsSinceEpoch(date).toString();
+      qDebug() << "  Open:" << record.open << "Range: [" << record.low << "," << record.high << "]";
+      isValid = false;
+    }
+    if (record.close < record.low || record.close > record.high) {
+      qDebug() << "ERROR: Close outside range at" << QDateTime::fromSecsSinceEpoch(date).toString();
+      qDebug() << "  Close:" << record.close << "Range: [" << record.low << "," << record.high << "]";
+      isValid = false;
+    }
+
+    if (!isValid) {
+      continue;  // Skip invalid data
+    }
+    QCandlestickSet *set = new QCandlestickSet(record.open, record.high, record.low, record.close, date * 1000);
+    series->append(set);
+  }
+  // QCandlestickSet *testGreen = new QCandlestickSet(100, 105, 99, 103, QDateTime::currentDateTime().toMSecsSinceEpoch());
+  // QCandlestickSet *testRed   = new QCandlestickSet(100, 104, 96, 98, QDateTime::currentDateTime().addDays(1).toMSecsSinceEpoch());
+  // series->append(testGreen);
+  // series->append(testRed);
   // Add series to chart
   chart->addSeries(series);
   // --- Configure Axes ---
@@ -843,8 +879,9 @@ void MainWindow::updateChart(const Stock &stock) {
 
   // Create custom X-axis for Date/Time
   QDateTimeAxis *axisX = new QDateTimeAxis();
-  axisX->setFormat("dd/MM/yyyy");  // Format for dates
+  axisX->setFormat("dd/MM hh:mm");  // Format for dates
   axisX->setTitleText("Date");
+  axisX->setTickCount(10);
   chart->addAxis(axisX, Qt::AlignBottom);  // or appropriate alignment
   series->attachAxis(axisX);
   // Create custom Y-axis for Value (Price)
@@ -857,22 +894,21 @@ void MainWindow::updateChart(const Stock &stock) {
   axisX->setRange(QDateTime::fromSecsSinceEpoch(stock.getHistoricalPrices().firstKey()),
                   QDateTime::fromSecsSinceEpoch(stock.getHistoricalPrices().lastKey()));
   // Find min/max price for Y-axis range
-  double minPrice = 0, maxPrice = 0;
+  double minPrice = std::numeric_limits<double>::max(), maxPrice = std::numeric_limits<double>::min();
   if (!stock.getHistoricalPrices().isEmpty()) {
-    minPrice = stock.getHistoricalPrices().first().close;
-    maxPrice = stock.getHistoricalPrices().first().close;
     for (HistoricalDataRecord &record : stock.getHistoricalPrices().values()) {
-      if (record.close < minPrice) {
-        minPrice = record.close;
+      if (record.low < minPrice) {
+        minPrice = record.low;
       }
-      if (record.close > maxPrice) {
-        maxPrice = record.close;
+      if (record.high > maxPrice) {
+        maxPrice = record.high;
       }
     }
   }
   axisY->setRange(qMax(minPrice * 0.95, 0.0), maxPrice * 1.05);  // Add a small buffer
 
-  chart->setTitle(QString("Historical Price for $%1").arg(stock.getSymbol()));
+  chart->setTitle(QString("Historical data for $%1").arg(stock.getSymbol()));
+  // stockChartView->setRubberBand(QChartView::RectangleRubberBand);
   // chart->legend()->setVisible(true);
   // chart->legend()->setAlignment(Qt::AlignBottom);
 
@@ -951,7 +987,10 @@ void MainWindow::setupPlaceholderChart() {
 void MainWindow::setupStockSelector() {
   // Create the dropdown selector
   stockSelector->clear();
-  stockSelector->addItem("Select a stock...", QVariant());  // Default placeholder item
+  if (!hasOneStocksData) {
+    stockSelector->addItem("Select a stock...", QVariant());  // Default placeholder item
+    return;
+  }
 
   // Populate with available stocks
   for (const Stock &stock : trackedStocks) {
@@ -1014,26 +1053,29 @@ void MainWindow::loadAllHistoricalData() {
   for (Stock &stock : trackedStocks) {
     if (stock.getLastHistoricalFetchTime() != 0 && stock.getHistoricalPrices().isEmpty()) {
       stock.setHistoricalPrices(dbManager->loadHistoricalPrices(stock.getSymbol()));
+      hasOneStocksData = true;
     }
   }
   setupStockSelector();
 }
 
 void MainWindow::onStockSelectionChanged(int index) {
-  if (index <= 0) {
-    // First item (placeholder) selected or invalid index
-    if (!hasPlaceholderChart) {
-      setupPlaceholderChart();
-      hasPlaceholderChart = true;
-    }
+  if (!hasOneStocksData) {
     return;
   }
+  // if (index <= 0) {
+  //   // First item (placeholder) selected or invalid index
+  //   if (!hasOneStocksData) {
+  //     setupPlaceholderChart();
+  //     hasOneStocksData = true;
+  //   }
+  //   return;
+  // }
 
   // Get selected stock
   QVariant stockData = stockSelector->itemData(index);
   if (stockData.isValid()) {
     Stock selectedStock = stockData.value<Stock>();
     updateChart(selectedStock);
-    hasPlaceholderChart = false;
   }
 }
