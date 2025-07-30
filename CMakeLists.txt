@@ -6,12 +6,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 # set(CMAKE_CXX_EXTENSIONS OFF)
+
 set(CMAKE_AUTOUIC ON) # Automatically process .ui files (for Qt Designer forms)
 set(CMAKE_AUTOMOC ON) # Automatically process MOC (Meta-Object Compiler) files
 set(CMAKE_AUTORCC ON) # Automatically process .qrc files (Qt Resource files)
 
 find_package(Qt6 COMPONENTS Widgets Charts Network Sql REQUIRED)
 # find_package(Qt6 COMPONENTS Charts REQUIRED)
+
 # Set output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -27,7 +29,8 @@ set(SOURCES
     src/downloadprogress.cpp
     src/heatmappainter.cpp
     )
-# Set heaeder files
+
+# Set header files
 set(HEADERS
     src/mainwindow.hpp
     src/stock.hpp
@@ -40,8 +43,42 @@ set(HEADERS
     src/heatmappainter.hpp
     )
 
-# Add executable
-add_executable(stock-tracker ${SOURCES} ${HEADERS})
+# Add executable with platform-specific properties
+if(APPLE)
+    add_executable(stock-tracker MACOSX_BUNDLE ${SOURCES} ${HEADERS})
+    
+    # Set macOS specific properties
+    set_target_properties(stock-tracker PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "StockTracker"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.stocktracker.app"
+        MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+        MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
+    )
+    
+    # Copy icon to bundle if it exists
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/images/logo.ico")
+        set_target_properties(stock-tracker PROPERTIES
+            MACOSX_BUNDLE_ICON_FILE "logo.ico"
+        )
+        # Copy icon to Resources folder
+        add_custom_command(TARGET stock-tracker POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_SOURCE_DIR}/images/logo.ico
+            $<TARGET_BUNDLE_CONTENT_DIR:stock-tracker>/Resources/logo.ico
+        )
+    endif()
+elseif(WIN32)
+    add_executable(stock-tracker WIN32 ${SOURCES} ${HEADERS})
+    
+    # Set Windows icon
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app.rc")
+        target_sources(stock-tracker PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/app.rc")
+    endif()
+else()
+    add_executable(stock-tracker ${SOURCES} ${HEADERS})
+endif()
 
 # Include directory
 target_include_directories(stock-tracker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -54,14 +91,16 @@ qt_add_resources(stock-tracker "resources"
 )
 
 # Link libraries
-target_link_libraries(stock-tracker PRIVATE 
+target_link_libraries(stock-tracker PRIVATE
     Qt6::Widgets
     Qt6::Charts
     Qt6::Network
     Qt6::Sql
 )
+
 # Add this line
 add_compile_definitions(_UCRT)
+
 # Compile options
 target_compile_options(stock-tracker PRIVATE
     $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Wpedantic>
@@ -72,6 +111,7 @@ target_compile_options(stock-tracker PRIVATE
 # Install executable
 install(TARGETS stock-tracker
     RUNTIME DESTINATION bin
+    BUNDLE DESTINATION .
     # LIBRARY DESTINATION lib
     # ARCHIVE DESTINATION lib
 )

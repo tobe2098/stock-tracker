@@ -70,7 +70,23 @@ MainWindow::MainWindow(QWidget *parent):
 
   // Instantiate QPushButton for adding stock
   addStockButton = new QPushButton("Add Stock", this);  // 'this' is the parent
-  addStockLayout->addWidget(addStockButton);            // Add to the horizontal layout
+  addStockButton->setStyleSheet(
+    "QPushButton { "
+    "border: 1px solid palette(light); "
+    "border-radius: 4px; "
+    "background-color: palette(dark);"
+    "padding: 0px; "        // Remove all padding
+    "margin: 0px; "         // Remove margins
+    "text-align: center; "  // Center text
+    "font-size: 16px; "     // Adjust font size if needed
+    "}"
+    "QPushButton:hover { "
+    "background-color: palette(mid); "
+    "}"
+    "QPushButton:pressed { "
+    "background-color: palette(light); "
+    "}");
+  addStockLayout->addWidget(addStockButton);  // Add to the horizontal layout
 
   // Add the horizontal layout to the main vertical layout
 

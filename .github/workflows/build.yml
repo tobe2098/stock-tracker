@@ -105,7 +105,10 @@ jobs:
     - name: Configure CMake
       working-directory: build
       run: |
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}" -G "${{ matrix.cmake_generator }}"
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}" \
+          -G "${{ matrix.cmake_generator }}"
 
     - name: Build application
       working-directory: build
@@ -142,9 +145,22 @@ jobs:
           cp images/logo.ico AppDir/usr/share/icons/hicolor/256x256/apps/stocktracker.ico
         fi
         
-        # Create AppImage
+        # Remove problematic SQL drivers that cause issues
+        if [ -d "${{ env.Qt6_DIR }}/plugins/sqldrivers" ]; then
+          find "${{ env.Qt6_DIR }}/plugins/sqldrivers" -name "*mimer*" -delete || true
+          find "${{ env.Qt6_DIR }}/plugins/sqldrivers" -name "*oracle*" -delete || true
+        fi
+        
+        # Create AppImage with error handling
         export QML_SOURCES_PATHS=src
-        ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage
+        export QMAKE=${{ env.Qt6_DIR }}/bin/qmake
+        export LD_LIBRARY_PATH=${{ env.Qt6_DIR }}/lib:$LD_LIBRARY_PATH
+        ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage || {
+          echo "AppImage creation failed, creating simple archive instead"
+          mkdir -p StockTracker-Linux
+          cp -r AppDir/usr/* StockTracker-Linux/
+          tar -czf StockTracker-Linux.tar.gz StockTracker-Linux/
+        }
 
     # Windows: Package with windeployqt
     - name: Package Windows application
@@ -162,12 +178,57 @@ jobs:
     - name: Package macOS application
       if: matrix.os == 'macos-latest'
       run: |
+        # Check if app bundle exists, if not create it
+        if [ ! -d "build/bin/stock-tracker.app" ]; then
+          echo "App bundle not found, creating one..."
+          mkdir -p build/bin/stock-tracker.app/Contents/{MacOS,Resources}
+          
+          # Copy executable
+          cp build/bin/stock-tracker build/bin/stock-tracker.app/Contents/MacOS/
+          
+          # Create Info.plist
+          cat > build/bin/stock-tracker.app/Contents/Info.plist << EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>stock-tracker</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.stocktracker.app</string>
+            <key>CFBundleName</key>
+            <string>StockTracker</string>
+            <key>CFBundleVersion</key>
+            <string>1.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.14</string>
+        </dict>
+        </plist>
+        EOF
+          
+          # Copy icon if exists
+          if [ -f "images/logo.ico" ]; then
+            cp images/logo.ico build/bin/stock-tracker.app/Contents/Resources/
+          fi
+        fi
+        
         # Deploy Qt libraries
         macdeployqt build/bin/stock-tracker.app -dmg
         
         # Move DMG to predictable location
         mkdir dist
-        mv build/bin/stock-tracker.dmg dist/StockTracker.dmg
+        if [ -f "build/bin/stock-tracker.dmg" ]; then
+          mv build/bin/stock-tracker.dmg dist/StockTracker.dmg
+        else
+          echo "DMG not created, creating archive instead"
+          tar -czf dist/StockTracker-macOS.tar.gz -C build/bin stock-tracker.app
+        fi
 
     # Upload artifacts
     - name: Upload Ubuntu AppImage
@@ -175,7 +236,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
-        path: StockTracker-*.AppImage
+        path: |
+          StockTracker-*.AppImage
+          StockTracker-Linux.tar.gz
 
     - name: Upload Windows build
       if: matrix.os == 'windows-latest'
@@ -189,7 +252,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
-        path: dist/StockTracker.dmg
+        path: |
+          dist/StockTracker.dmg
+          dist/StockTracker-macOS.tar.gz
 
   # Create release on tag push
   release:
