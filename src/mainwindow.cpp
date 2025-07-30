@@ -5,6 +5,7 @@
 // #include <QDateTime>
 #include <QCheckBox>
 #include <QDebug>  // For debugging output (like console.log in JS)
+#include <QDialogButtonBox>
 #include <QFont>
 #include <QFormLayout>
 #include <QGroupBox>
