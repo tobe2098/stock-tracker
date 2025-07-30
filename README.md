@@ -1,7 +1,7 @@
 # stocktracker
 A stock-tracker using Qt and C++
 
-[![tobe's Stock Tracker](https://github.com/tobe2098/stock-tracker/actions/workflows/build.yml/badge.svg?event=release)](https://github.com/tobe2098/stock-tracker/actions/workflows/build.yml)
+[![tobe's Stock Tracker](https://github.com/tobe2098/stock-tracker/actions/workflows/build.yml/badge.svg)](https://github.com/tobe2098/stock-tracker/actions/workflows/build.yml)
 
 # Installation instructions
 
