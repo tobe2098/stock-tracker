@@ -24,10 +24,14 @@ class StockListItemWidget : public QWidget {
     // Signal emitted when the "Delete from DB" button is clicked
     void deleteClicked(const QString &symbol);
 
+    // Signal emitted when the "Download" button is clicked
+    void downloadClicked(const QString &symbol);
+
   private:
     QLabel      *stockLabel;
     QPushButton *removeButton;
     QPushButton *deleteButton;
+    QPushButton *downloadButton;
     QString      symbol;  // Store the symbol to emit with signals
 };
 

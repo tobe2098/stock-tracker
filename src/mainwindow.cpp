@@ -381,22 +381,6 @@ void MainWindow::onStockListItemClicked(QListWidgetItem *item) {
     qDebug() << "Selected stock:" << symbol;
     if (stock) {
       displayStockDetails(*stock);
-
-      time_record_t now = QDateTime::currentSecsSinceEpoch();
-      if (stock->getLastHistoricalFetchTime() != 0 && now - stock->getLastHistoricalFetchTime() < HISTORICAL_CACHE_LIFETIME_SECS) {
-        statusMessage(QString("Historical data for '%1' is recent. Using cached data.").arg(symbol), 3000);
-        qDebug() << "Historical data for" << symbol << "is recent. Using cached data.";
-        if (stock->getHistoricalPrices().size() == 0) {
-          stock->setHistoricalPrices(dbManager->loadHistoricalPrices(stock->getSymbol()));
-          setupStockSelector();
-        }
-        updateChart(*stock);  // Use existing historical data
-        mainTabWidget->setCurrentIndex(chart_tab_id);
-        return;
-      }
-
-      statusMessage(QString("Historical data for '%1' is stale. Fetching...").arg(symbol), 500);
-      QMetaObject::invokeMethod(dataFetcher, "fetchHistoricalData", Qt::QueuedConnection, Q_ARG(QString, symbol));
     }
   }
 }
@@ -479,6 +463,26 @@ void MainWindow::onDeleteStockFromDbClicked(const QString &symbol) {
     }
   }
 }
+void MainWindow::onDownloadStockClicked(const QString &symbol) {
+  Stock *stock = findStockBySymbol(symbol);  // Get stock from in-memory list
+  if (stock) {
+    time_record_t now = QDateTime::currentSecsSinceEpoch();
+    if (stock->getLastHistoricalFetchTime() != 0 && now - stock->getLastHistoricalFetchTime() < HISTORICAL_CACHE_LIFETIME_SECS) {
+      statusMessage(QString("Historical data for '%1' is recent. Using cached data.").arg(symbol), 3000);
+      qDebug() << "Historical data for" << symbol << "is recent. Using cached data.";
+      if (stock->getHistoricalPrices().size() == 0) {
+        stock->setHistoricalPrices(dbManager->loadHistoricalPrices(stock->getSymbol()));
+        setupStockSelector();
+      }
+      updateChart(*stock);  // Use existing historical data
+      mainTabWidget->setCurrentIndex(chart_tab_id);
+      return;
+    }
+
+    statusMessage(QString("Historical data for '%1' is stale. Fetching...").arg(symbol), 500);
+    QMetaObject::invokeMethod(dataFetcher, "fetchHistoricalData", Qt::QueuedConnection, Q_ARG(QString, symbol));
+  }
+}
 // Helper method to update the QListWidget display
 void MainWindow::updateStockListDisplay() {
   stockListWidget->clear();  // Clear all existing items first
@@ -501,6 +505,9 @@ void MainWindow::updateStockListDisplay() {
     // Connect the custom widget's signals to MainWindow's new slots
     // This connects specific signals from 'customItemWidget' to slots in 'this' (MainWindow).
     // Each 'customItemWidget' instance for each stock has its own connections.
+
+    // Connection for "Download historical data"
+    connect(customItemWidget, &StockListItemWidget::downloadClicked, this, &MainWindow::onDownloadStockClicked);
 
     // Connection for "Remove from RAM"
     connect(customItemWidget, &StockListItemWidget::removeClicked, this, &MainWindow::onRemoveStockFromRamClicked);
@@ -685,10 +692,12 @@ void MainWindow::onChartDataUpdated(const QList<QPair<qint64, double>> &historic
 }
 
 void MainWindow::onTabChanged(int index) {
-  if (mainTabWidget->tabText(index) == "Stock Heatmap") {
+  if (index == heatmap_tab_id) {
     updateHeatmap();  // Ensure heatmap is updated when its tab is selected
-  } else if (mainTabWidget->tabText(index) == "Stock Chart") {
-    loadAllHistoricalData();
+  } else if (index == chart_tab_id) {
+    if (!historicalDataFetchedFromDB) {
+      loadAllHistoricalData();
+    }
     // If you want to auto-display chart of selected stock when tab is changed
     // you'd need to remember the last selected stock and call updateChart.
     // For now, it updates when stock list item is clicked.
@@ -711,22 +720,27 @@ void MainWindow::onStockDataFetched(const Stock &stock) {
     existingStock->setPriceChange(stock.getPriceChange());
     existingStock->setLastQuoteFetchTime(fetchedStockCopy.getLastQuoteFetchTime());
     existingStock->setDayStats(fetchedStockCopy.getDayStats());
+    dbManager->addOrUpdateStock(*existingStock);
+    updateStockListDisplay();             // Refresh the list widget
+    displayStockDetails(*existingStock);  // Display details of the newly fetched/updated stock
     qDebug() << "Updated existing stock:" << stock.getSymbol();
   } else {
     trackedStocks.append(fetchedStockCopy);  // Add new stock to our list
+    dbManager->addOrUpdateStock(fetchedStockCopy);
+    updateStockListDisplay();               // Refresh the list widget
+    displayStockDetails(fetchedStockCopy);  // Display details of the newly fetched/updated stock
     qDebug() << "Added new stock:" << stock.getSymbol();
   }
   // Save/update stock to database (important!)
-  dbManager->addOrUpdateStock(fetchedStockCopy);
-
-  updateStockListDisplay();               // Refresh the list widget
-  displayStockDetails(fetchedStockCopy);  // Display details of the newly fetched/updated stock
   updateHeatmap();
 }
 // New slot for historical data fetched
 void MainWindow::onHistoricalDataFetched(const QString &symbol, const QMap<time_record_t, HistoricalDataRecord> &historicalData) {
   qDebug() << "Historical data fetched for:" << symbol << " (" << historicalData.size() << " points)";
   Stock *stock = findStockBySymbol(symbol);
+  // if (!historicalDataFetchedFromDB) {
+  //   loadAllHistoricalData();
+  // }
   if (stock) {
     stock->setHistoricalPrices(historicalData);  // Set historical prices for the stock
     stock->setLastHistoricalFetchTime(QDateTime::currentSecsSinceEpoch());
@@ -977,6 +991,7 @@ void MainWindow::loadSettings() {
 }
 
 void MainWindow::loadAllHistoricalData() {
+  historicalDataFetchedFromDB = true;
   for (Stock &stock : trackedStocks) {
     if (stock.getLastHistoricalFetchTime() != 0 && stock.getHistoricalPrices().isEmpty()) {
       stock.setHistoricalPrices(dbManager->loadHistoricalPrices(stock.getSymbol()));
@@ -984,8 +999,6 @@ void MainWindow::loadAllHistoricalData() {
   }
   setupStockSelector();
 }
-
-void MainWindow::fetchAllQuotes() { }
 
 void MainWindow::onStockSelectionChanged(int index) {
   if (index <= 0) {

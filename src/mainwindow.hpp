@@ -82,6 +82,7 @@ class MainWindow : public QMainWindow {
     // NEW SLOTS for button clicks in custom item widgets
     void onRemoveStockFromRamClicked(const QString &symbol);
     void onDeleteStockFromDbClicked(const QString &symbol);
+    void onDownloadStockClicked(const QString &symbol);
 
   private:
     // Declare pointers to our UI widgets.
@@ -121,6 +122,8 @@ class MainWindow : public QMainWindow {
     const QString DATABASE_FILE_PATH             = "stocks.db";   // SQLite database file name
     const int     QUOTE_CACHE_LIFETIME_SECS      = 5 * 60;        // 5 minutes cache for current quotes
     const int     HISTORICAL_CACHE_LIFETIME_SECS = 24 * 60 * 60;  // 24 hours cache for historical data
+
+    bool historicalDataFetchedFromDB { false };
     // Helper methods for managing the UI and data display.
     // These are regular private member functions.
     void updateStockListDisplay();
@@ -137,7 +140,6 @@ class MainWindow : public QMainWindow {
     void loadSettings();
 
     void loadAllHistoricalData();
-    void fetchAllQuotes();
     // void createPlaceholderData();
     void   statusMessage(const QString &message, qint64 duration);
     Stock *findStockBySymbol(const QString &symbol);
