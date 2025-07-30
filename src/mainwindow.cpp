@@ -963,6 +963,8 @@ void MainWindow::loadAllHistoricalData() {
   setupStockSelector();
 }
 
+void MainWindow::fetchAllQuotes() { }
+
 void MainWindow::onStockSelectionChanged(int index) {
   if (index <= 0) {
     // First item (placeholder) selected or invalid index

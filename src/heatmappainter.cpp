@@ -83,6 +83,7 @@ void HeatmapPainter::paintEvent(QPaintEvent *event) {
       break;
     }
     stock.ordinal -= subtraction;
+
     debtor_counter--;
   }
   // Start the recursive drawing
@@ -90,7 +91,7 @@ void HeatmapPainter::paintEvent(QPaintEvent *event) {
 }
 
 void HeatmapPainter::drawHeatmapStripAlgorithmForward(QPainter *painter, const QList<HeatmapRectData> &data, const QRectF &bounds) {
-  bool      is_strip_horizontal { true };
+  bool      is_strip_horizontal { bounds.height() > bounds.width() };
   qsizetype start_current {}, start_next {};
 
   // Two strips, also swap?
@@ -105,9 +106,6 @@ void HeatmapPainter::drawHeatmapStripAlgorithmForward(QPainter *painter, const Q
     //   -The boolean is inverted
     //   -The rectangle within which the undrawn current is, is partitioned in remaining
     //
-    //  if (current_strip.isEmpty()) {
-    //    // This happens in the first iteration and every time the current and next strips are merged
-    //  }
     //  Compute the start of the next strip
     start_next = start_current + current_strip.size();
     // If there is enough to make a next strip, look forward
@@ -133,12 +131,21 @@ void HeatmapPainter::drawHeatmapStripAlgorithmForward(QPainter *painter, const Q
         }
         // while loop to try again? Ignore, we just merge and continue with current_strip on empty
       }
+      // painter->fillRect(remaining, Qt::white);
+      // painter->drawRect(remaining);  // Draw border
+      // drawStrip(painter, current_strip);
+      // painter->fillRect(remaining, Qt::red);
+      // painter->drawRect(remaining);  // Draw border
+      // return;
       drawStrip(painter, current_strip);
+      // painter->fillRect(next_rectangle, Qt::blue);
+      // painter->drawRect(next_rectangle);  // Draw border
       remaining           = next_rectangle;
       current_strip       = next_strip;
       current_ratio       = next_ratio;
       start_current       = start_next;
       is_strip_horizontal = !is_strip_horizontal;
+      // return;
     } else {
       drawStrip(painter, current_strip);
       // start_current = start_next;
@@ -147,7 +154,7 @@ void HeatmapPainter::drawHeatmapStripAlgorithmForward(QPainter *painter, const Q
     }
     // Here we draw the current_Strip wether merged or not, which means I have to assign it, so may as well create it
     // After draw we need to get a new rectf
-    // Also clean current_strip and assign next_strip to it (if merged should be empty)
+    // Also clean current_strip and assign next_strip to it (if merged should be empty)z
     // Next_rectangle should be the actual remaining as well, which means that it has to be recalc'ed in the merged branch
   }
 }
@@ -186,6 +193,7 @@ QPair<qreal, QList<HeatmapPainter::HeatmapRectData>> HeatmapPainter::buildStrip(
     area_sum += data[start_index].ordinal;
     strip.push_back(data[start_index]);
     if (ratio_min) {
+      setSquares(strip, rectangle, is_strip_horizontal, area_sum);
       qreal ratio_sum {};
       for (const HeatmapRectData &square : strip) {
         ratio_sum += qMax(square.rect.width() / square.rect.height(), square.rect.height() / square.rect.width());
@@ -195,6 +203,7 @@ QPair<qreal, QList<HeatmapPainter::HeatmapRectData>> HeatmapPainter::buildStrip(
       if (prev_avg_ratio < curr_ratio) {
         area_sum -= strip.back().ordinal;
         strip.pop_back();
+        number_of_sq--;
         break;
       } else {
         prev_avg_ratio = curr_ratio;
@@ -203,25 +212,8 @@ QPair<qreal, QList<HeatmapPainter::HeatmapRectData>> HeatmapPainter::buildStrip(
 
     start_index++;
   }
-  qreal strip_height { area_sum / (is_strip_horizontal ? rectangle.width() : rectangle.height()) },
-    inverse_strip_height { 1 / strip_height }, x_pos { rectangle.x() }, y_pos { rectangle.y() };
-  if (is_strip_horizontal) {
-    for (HeatmapRectData &square : strip) {
-      square.rect.setHeight(strip_height);
-      square.rect.setWidth(square.ordinal * inverse_strip_height);
-      square.rect.setY(y_pos);
-      square.rect.setX(x_pos);
-      x_pos += square.rect.width();
-    }
-  } else {
-    for (HeatmapRectData &square : strip) {
-      square.rect.setWidth(strip_height);
-      square.rect.setHeight(square.ordinal * inverse_strip_height);
-      square.rect.setY(y_pos);
-      square.rect.setX(x_pos);
-      y_pos -= square.rect.height();
-    }
-  }
+  setSquares(strip, rectangle, is_strip_horizontal, area_sum);
+
   if (!ratio_min) {
     qreal ratio_sum {};
     for (const HeatmapRectData &square : strip) {
@@ -237,12 +229,12 @@ QRectF HeatmapPainter::makeSplit(const QRectF &remaining, const HeatmapRectData 
   QRectF resulting_rectangle { remaining };
   if (is_strip_horizontal) {
     qreal used_height { stock_square.rect.height() };
-    resulting_rectangle.setY(resulting_rectangle.y() - used_height);
-    resulting_rectangle.setHeight(resulting_rectangle.height() - used_height);
+    resulting_rectangle.setY(resulting_rectangle.y() + used_height);
+    // resulting_rectangle.setHeight(resulting_rectangle.height() - used_height);
   } else {
     qreal used_width { stock_square.rect.width() };
-    resulting_rectangle.setX(resulting_rectangle.x() - used_width);
-    resulting_rectangle.setWidth(resulting_rectangle.width() - used_width);
+    resulting_rectangle.setX(resulting_rectangle.x() + used_width);
+    // resulting_rectangle.setWidth(resulting_rectangle.width() - used_width);
   }
   return resulting_rectangle;
 }
@@ -251,17 +243,44 @@ void HeatmapPainter::drawStrip(QPainter *painter, const QList<HeatmapRectData> &
   for (const HeatmapRectData &square : strip) {
     QColor fillColor = getColorForChange(square.stock->getPriceChange());
     painter->fillRect(square.rect, fillColor);
+    painter->setPen(Qt::black);
     painter->drawRect(square.rect);  // Draw border
 
     // Draw text
-    painter->setPen(fillColor.lightness() < 128 ? Qt::white : Qt::black);  // Choose text color based on background lightness
+    painter->setPen(fillColor.lightness() < 96 ? Qt::white : Qt::black);  // Choose text color based on background lightness
     QFont font = painter->font();
-    font.setPointSize(std::max(8, (int)(square.rect.height() / 8)));  // Adjust font size based on rect height
+    font.setPointSize(std::max(8, (int)(qMin(square.rect.height(), square.rect.width()) / 8)));  // Adjust font size based on rect height
     painter->setFont(font);
 
     // Draw symbol and price
     QString text = square.stock->getSymbol() + "\n" + QString("$%1").arg(square.stock->getCurrentPrice(), 0, 'f', 2);
+    // qDebug() << text;
     painter->drawText(square.rect.adjusted(2, 2, -2, -2), Qt::AlignCenter | Qt::TextWordWrap, text);
+  }
+  // qDebug() << "Strip separator";
+}
+
+void HeatmapPainter::setSquares(QList<HeatmapRectData> &strip, const QRectF &rectangle, bool is_strip_horizontal, qreal area_sum) {
+  qreal strip_height { area_sum / (is_strip_horizontal ? rectangle.width() : rectangle.height()) },
+    inverse_strip_height { 1 / strip_height }, x_pos { rectangle.x() }, y_pos { rectangle.y() };
+  if (is_strip_horizontal) {
+    for (HeatmapRectData &square : strip) {
+      square.rect.setY(y_pos);
+      square.rect.setX(x_pos);
+      square.rect.setHeight(strip_height);
+      square.rect.setWidth(square.ordinal * inverse_strip_height);
+
+      x_pos += square.rect.width();
+    }
+  } else {
+    for (HeatmapRectData &square : strip) {
+      square.rect.setY(y_pos);
+      square.rect.setX(x_pos);
+      square.rect.setWidth(strip_height);
+      square.rect.setHeight(square.ordinal * inverse_strip_height);
+
+      y_pos += square.rect.height();
+    }
   }
 }
 

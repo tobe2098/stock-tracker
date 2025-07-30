@@ -137,6 +137,7 @@ class MainWindow : public QMainWindow {
     void loadSettings();
 
     void loadAllHistoricalData();
+    void fetchAllQuotes();
     // void createPlaceholderData();
     void   statusMessage(const QString &message, qint64 duration);
     Stock *findStockBySymbol(const QString &symbol);

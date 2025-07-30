@@ -37,6 +37,8 @@ class HeatmapPainter : public QWidget {
 
     void drawStrip(QPainter *painter, const QList<HeatmapRectData> &strip);
 
+    void setSquares(QList<HeatmapRectData> &strip, const QRectF &rectangle, bool is_strip_horizontal, qreal area_sum);
+
   public:
     HeatmapPainter(QWidget *parent = nullptr);
     ~HeatmapPainter();
