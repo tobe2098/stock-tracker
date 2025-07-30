@@ -2,10 +2,10 @@ name: Build StockTracker
 
 on:
   push:
-    branches: [ main, develop ]
+    # branches: [ main, develop ]
     tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
+  # pull_request:
+  #   branches: [ main ]
 
 env:
   QT_VERSION: '6.6.0'
@@ -258,6 +258,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout code
@@ -271,14 +273,44 @@ jobs:
     - name: Display structure of downloaded files
       run: ls -la artifacts/
     
+    - name: Extract tag name
+      id: tag
+      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+    
+    - name: Prepare release assets
+      run: |
+        mkdir release-assets
+        
+        # Handle Linux artifacts (AppImage or tar.gz)
+        if [ -f "artifacts/StockTracker-Linux/StockTracker-x86_64.AppImage" ]; then
+          cp "artifacts/StockTracker-Linux/StockTracker-x86_64.AppImage" "release-assets/StockTracker-Linux-x86_64.AppImage"
+        elif [ -f "artifacts/StockTracker-Linux/StockTracker-Linux.tar.gz" ]; then
+          cp "artifacts/StockTracker-Linux/StockTracker-Linux.tar.gz" "release-assets/StockTracker-Linux.tar.gz"
+        fi
+        
+        # Handle Windows artifacts
+        if [ -d "artifacts/StockTracker-Windows" ]; then
+          cd "artifacts/StockTracker-Windows"
+          zip -r "../../release-assets/StockTracker-Windows.zip" *
+          cd ../..
+        fi
+        
+        # Handle macOS artifacts (DMG or tar.gz)
+        if [ -f "artifacts/StockTracker-macOS/StockTracker.dmg" ]; then
+          cp "artifacts/StockTracker-macOS/StockTracker.dmg" "release-assets/StockTracker-macOS.dmg"
+        elif [ -f "artifacts/StockTracker-macOS/StockTracker-macOS.tar.gz" ]; then
+          cp "artifacts/StockTracker-macOS/StockTracker-macOS.tar.gz" "release-assets/StockTracker-macOS.tar.gz"
+        fi
+        
+        # List what we have
+        echo "Release assets prepared:"
+        ls -la release-assets/
+    
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref }}
-        release_name: StockTracker ${{ github.ref }}
+        tag_name: ${{ steps.tag.outputs.tag }}
+        name: StockTracker ${{ steps.tag.outputs.tag }}
         draft: false
         prerelease: false
         body: |
@@ -287,55 +319,34 @@ jobs:
           - Built with Qt ${{ env.QT_VERSION }}
           
           ## Downloads
-          - **Linux**: Download the `.AppImage` file
+          - **Linux**: Download the `.AppImage` file (or `.tar.gz` if AppImage failed)
           - **Windows**: Download and extract the ZIP file
-          - **macOS**: Download the `.dmg` file
+          - **macOS**: Download the `.dmg` file (or `.tar.gz` if DMG failed)
           
           ## Installation
           ### Linux
+          **AppImage:**
           1. Download the AppImage
           2. Make it executable: `chmod +x StockTracker-*.AppImage`
           3. Run: `./StockTracker-*.AppImage`
+          
+          **Tar.gz:**
+          1. Download and extract: `tar -xzf StockTracker-Linux.tar.gz`
+          2. Run: `./StockTracker-Linux/bin/stock-tracker`
           
           ### Windows
           1. Download and extract the ZIP file
           2. Run `stock-tracker.exe`
           
           ### macOS
+          **DMG:**
           1. Download the DMG file
           2. Open it and drag StockTracker to Applications
-
-    - name: Upload Linux AppImage
-      uses: actions/upload-release-asset@v1
+          
+          **Tar.gz:**
+          1. Download and extract: `tar -xzf StockTracker-macOS.tar.gz`
+          2. Run the app from the extracted folder
+        files: release-assets/*
+        fail_on_unmatched_files: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: artifacts/StockTracker-Linux/StockTracker-x86_64.AppImage
-        asset_name: StockTracker-Linux-x86_64.AppImage
-        asset_content_type: application/octet-stream
-
-    - name: Create Windows ZIP
-      run: |
-        cd artifacts/StockTracker-Windows
-        zip -r ../../StockTracker-Windows.zip *
-
-    - name: Upload Windows ZIP
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: StockTracker-Windows.zip
-        asset_name: StockTracker-Windows.zip
-        asset_content_type: application/zip
-
-    - name: Upload macOS DMG
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: artifacts/StockTracker-macOS/StockTracker.dmg
-        asset_name: StockTracker-macOS.dmg
-        asset_content_type: application/octet-stream
