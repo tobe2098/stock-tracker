@@ -87,7 +87,7 @@ class StockDataFetcher : public QObject {
     QList<time_record_t> lastHistoricalRequests;
     quint64              earliestRequest;
     const static qint64  SYMBOL_REQUEST_INTERVAL_MS { 1100 };  // Example: 1.1 seconds
-    const static qint64  MAX_HISTORICAL_REQUESTS_PER_INTERVAL { 1 };
+    const static qint64  MAX_HISTORICAL_REQUESTS_PER_INTERVAL { 25 };
     const static qint64  HISTORICAL_REQUESTS_INTERVAL { 1 * 24 * 3600 };  // In seconds
     // const quint64 HISTORICAL_REQUEST_INTERVAL_MS { 1100 };  // Example: 1.1 seconds
     // Static member to hold the custom attribute ID

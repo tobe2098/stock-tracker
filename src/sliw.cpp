@@ -41,7 +41,7 @@ StockListItemWidget::StockListItemWidget(const QString &symbol, const QString &d
     "font-size: 20px; "     // Adjust font size if needed
     "}"
     "QPushButton:hover { "
-    "background-color: palette(dark); "
+    "background-color: palette(mid); "
     "}"
     "QPushButton:pressed { "
     "background-color: palette(light); "
@@ -65,7 +65,7 @@ StockListItemWidget::StockListItemWidget(const QString &symbol, const QString &d
     "font-size: 16px; "          // Adjust font size if needed
     "}"
     "QPushButton:hover { "
-    "background-color: palette(dark); "
+    "background-color: palette(mid); "
     "}"
     "QPushButton:pressed { "
     "background-color: palette(light); "
@@ -93,7 +93,7 @@ StockListItemWidget::StockListItemWidget(const QString &symbol, const QString &d
     "font-size: 16px; "     // Adjust font size if needed
     "}"
     "QPushButton:hover { "
-    "background-color: palette(dark); "
+    "background-color: palette(mid); "
     "}"
     "QPushButton:pressed { "
     "background-color: palette(light); "

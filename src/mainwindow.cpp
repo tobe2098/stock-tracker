@@ -66,10 +66,12 @@ MainWindow::MainWindow(QWidget *parent):
   // Instantiate QLineEdit for stock symbol input
   stockSymbolLineEdit = new QLineEdit(this);  // 'this' (MainWindow) is the parent
   stockSymbolLineEdit->setPlaceholderText("Enter stock symbol (e.g., AAPL)");
-  addStockLayout->addWidget(stockSymbolLineEdit);  // Add to the horizontal layout
+  // stockSymbolLineEdit->setFixedHeight(26);
+  addStockLayout->addWidget(stockSymbolLineEdit, 0, Qt::AlignVCenter);  // Add to the horizontal layout
 
   // Instantiate QPushButton for adding stock
   addStockButton = new QPushButton("Add Stock", this);  // 'this' is the parent
+  addStockButton->setFixedSize(90, 27);
   addStockButton->setStyleSheet(
     "QPushButton { "
     "border: 1px solid palette(light); "
@@ -86,7 +88,7 @@ MainWindow::MainWindow(QWidget *parent):
     "QPushButton:pressed { "
     "background-color: palette(light); "
     "}");
-  addStockLayout->addWidget(addStockButton);  // Add to the horizontal layout
+  addStockLayout->addWidget(addStockButton, 0, Qt::AlignVCenter);  // Add to the horizontal layout
 
   // Add the horizontal layout to the main vertical layout
 
@@ -651,7 +653,7 @@ void MainWindow::onSettingsButtonClicked() {
   QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &settingsDialog);
 
   // Custom Save button text
-  buttonBox->button(QDialogButtonBox::Save)->setText("Save Settings");
+  buttonBox->button(QDialogButtonBox::Save)->setText("Save");
 
   layout->addWidget(buttonBox);
 

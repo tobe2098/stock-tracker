@@ -28,8 +28,9 @@ A stock-tracker using Qt and C++
 - Semi Frequent storage of settings. DONE
 - Load json from API query for history (try to make it a rich query, intra and interday) DONE
 - Heatmap fetch all quotes at startup DONE
+- Special button for the API request. DONE
 
-
+- Make chart be actual candles.
 - When swapping between charts, keep the scale stored
 - If there is at least one chart, delete placeholder
 - When clock counter is 0, it should show how many requests we have left.
@@ -38,7 +39,6 @@ A stock-tracker using Qt and C++
 - Graph button for
 - Ability to track your portfolio (introduce manually, stored).
 - Display API requests left. Recovered either from DB or by checking each stored stock (problem is if deleted). Store a queue of timestamps
-- Special button for the API request.
 - Change chart to be candles.
 - Load historic data of stocks on startup
 - Retrieving data from API request progress bar?

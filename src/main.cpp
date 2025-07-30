@@ -1,6 +1,8 @@
 
 #include <QApplication>  // Required for any Qt GUI application
-#include <QStyleFactory>
+#include <QPalette>
+// #include <QStyleFactory>
+
 #include "mainwindow.hpp"
 int main(int argc, char *argv[]) {
   // QApplication manages the GUI application's control flow and main settings.
@@ -21,7 +23,60 @@ int main(int argc, char *argv[]) {
   // // Set the QLabel as the central widget of the main window.
   // // A QMainWindow can only have one central widget.
   // mainWindow.setCentralWidget(welcomeLabel);
+  // Create dark palette
+  QPalette darkPalette;
+  // Base dark greys
+  QColor windowColor(40, 40, 40);
+  QColor baseColor(30, 30, 30);
+  QColor midColor(60, 60, 60);       // for palette(mid)
+  QColor midlightColor(80, 80, 80);  // for palette(midlight)
+  QColor darkColor(20, 20, 20);      // for palette(dark)
 
+  // Text colors
+  QColor textColor(220, 220, 220);
+  QColor disabledTextColor(130, 130, 130);
+
+  // Highlights
+  QColor highlightColor(60, 120, 215);  // nice blue
+  QColor highlightedTextColor(255, 255, 255);
+  QColor disabledHighlightColor(80, 80, 80);
+
+  // Buttons
+  QColor buttonColor(windowColor);
+  QColor buttonTextColor(textColor);
+
+  // Tooltips
+  QColor toolTipBaseColor(textColor);
+  QColor toolTipTextColor(textColor);
+
+  // Set colors for active state
+  darkPalette.setColor(QPalette::Window, windowColor);
+  darkPalette.setColor(QPalette::WindowText, textColor);
+  darkPalette.setColor(QPalette::Base, baseColor);
+  darkPalette.setColor(QPalette::AlternateBase, midColor);
+  darkPalette.setColor(QPalette::Mid, midColor);
+  darkPalette.setColor(QPalette::Midlight, midlightColor);
+  darkPalette.setColor(QPalette::Dark, darkColor);
+  darkPalette.setColor(QPalette::Text, textColor);
+  darkPalette.setColor(QPalette::Button, buttonColor);
+  darkPalette.setColor(QPalette::ButtonText, buttonTextColor);
+  darkPalette.setColor(QPalette::BrightText, QColor(255, 0, 0));
+
+  darkPalette.setColor(QPalette::Highlight, highlightColor);
+  darkPalette.setColor(QPalette::HighlightedText, highlightedTextColor);
+  darkPalette.setColor(QPalette::ToolTipBase, toolTipBaseColor);
+  darkPalette.setColor(QPalette::ToolTipText, toolTipTextColor);
+
+  // Set colors for disabled state
+  darkPalette.setColor(QPalette::Disabled, QPalette::WindowText, disabledTextColor);
+  darkPalette.setColor(QPalette::Disabled, QPalette::Text, disabledTextColor);
+  darkPalette.setColor(QPalette::Disabled, QPalette::ButtonText, disabledTextColor);
+  darkPalette.setColor(QPalette::Disabled, QPalette::Highlight, disabledHighlightColor);
+  darkPalette.setColor(QPalette::Disabled, QPalette::HighlightedText, disabledTextColor);
+
+  app.setPalette(darkPalette);
+  // Optional: Use Fusion style which works well with dark palette
+  // app.setStyle("Fusion");
   // Show the main window
   mainWindow.show();
 
