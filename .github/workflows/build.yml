@@ -165,11 +165,11 @@ jobs:
       working-directory: build
       run: |
         # Run windeployqt from the proper bin folder
-        & "${env:Qt6_DIR}\bin\windeployqt.exe" ".\Release\stock-tracker.exe" --release --no-translations --no-system-d3d-compiler
+        & "${env:Qt6_DIR}\bin\windeployqt.exe" ".\build\bin\Release\stock-tracker.exe" --release --no-translations --no-system-d3d-compiler
 
         # Create distribution folder
         mkdir ..\dist
-        xcopy /E /I .\Release ..\dist\StockTracker\
+        xcopy /E /I .\build\bin\Release ..\dist\StockTracker\
       shell: pwsh
     - name: Verify Qt DLLs copied
       if: matrix.os == 'windows-latest'
