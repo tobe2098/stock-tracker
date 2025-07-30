@@ -1,5 +1,6 @@
 # stocktracker
 A stock-tracker using Qt and C++
+
 [![tobe's Stock Tracker](https://github.com/tobe2098/stock-tracker/actions/workflows/build.yml/badge.svg?event=release)](https://github.com/tobe2098/stock-tracker/actions/workflows/build.yml)
 
 # Installation instructions
@@ -7,7 +8,7 @@ A stock-tracker using Qt and C++
 1. Install Qt-core, Qt-network in your OS. Make sure the paths are available to CMake (PATH variable).
 2. Run cmake
 3. Obtain free API keys from alphavantage and finnhub.
-4. Run the program and put the keys in the boxes.
+4. Run the program and put the keys in the boxes found in settings and save the settings.
 5. Now you can enjoy using the program to see stock data and stock plots, as well as the starting heatmap.
 
 ## To-do
@@ -18,7 +19,7 @@ A stock-tracker using Qt and C++
 - Delete button for stocks (deletes from memory and from database) DONE
 - Improve X axis manipulation. Maybe a time scroller? Done
 - Fetching notification only during fetching, not require click. Doing (also notification when deleted, only appear in  the bottom right) DONE
-- Rate limit calculations, tracking and message to avoid, but override. Doing Partially done, only thing left is what we do with exceeded rate limits. Nothing for now, DONEP
+- Rate limit calculations, tracking and message to avoid, but override. Doing Partially done, only thing left is what we do with exceeded rate limits. Nothing for now, DONE
 - Separate thread for fetching each (reason for queues apart from rate limits) and processing. DONE
 - Waiting timer for historical request in bottom left, while the other progress bars are in the right? If possible NO
 - When writing another historical request to queue and it is stuck in the queue, check if time is gone, if not emit. If time is gone, ignore. DONE
