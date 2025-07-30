@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
-project(StockTracker VERSION 1.0.0 LANGUAGES CXX)
+project(StockTracker VERSION 1.0.3 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)

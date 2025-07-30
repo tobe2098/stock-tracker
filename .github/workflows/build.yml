@@ -162,15 +162,18 @@ jobs:
     # Windows: Package with windeployqt
     - name: Package Windows application
       if: matrix.os == 'windows-latest'
-      working-directory: build/bin
       run: |
-        # Deploy Qt libraries
-        windeployqt.exe --release --no-translations --no-system-d3d-compiler stock-tracker.exe
-        
-        # Create distribution folder
-        mkdir ../../dist
-        xcopy /E /I . ..\..\dist\StockTracker\
+        # Move into build directory
+        cd build
 
+        # Use full path to windeployqt
+        $qtBin = "$env:Qt6_DIR\..\..\bin\windeployqt.exe"
+        & $qtBin ".\Release\stock-tracker.exe" --release --no-translations --no-system-d3d-compiler
+
+        # Create distribution folder
+        mkdir ..\dist
+        xcopy /E /I .\Release ..\dist\StockTracker\
+      shell: pwsh
     # macOS: Create app bundle and DMG
     - name: Package macOS application
       if: matrix.os == 'macos-latest'
