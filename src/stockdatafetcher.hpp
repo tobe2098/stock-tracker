@@ -105,4 +105,16 @@ class StockDataFetcher : public QObject {
     };
     QString generateDownloadId(const QString &symbol, RequestType type);
 };
+
+class ConnectivityChecker : public QObject {
+    Q_OBJECT
+
+  private:
+    QNetworkAccessManager *manager;
+
+  public:
+    ConnectivityChecker(QObject *parent = nullptr): QObject(parent) { manager = new QNetworkAccessManager(this); }
+
+    bool checkInternetConnection();
+};
 #endif  // MAINWINDOW_H

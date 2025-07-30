@@ -326,3 +326,26 @@ QStringList StockDataFetcher::saveHistoricalRequestList() {
 void StockDataFetcher::onHistoricalRequestTimerTimeout() {
   processNextRequestHistorical();
 }
+
+bool ConnectivityChecker::checkInternetConnection() {
+  QNetworkRequest request(QUrl("http://www.google.com"));
+  request.setRawHeader("User-Agent", "ConnectivityCheck");
+
+  QNetworkReply *reply = manager->head(request);
+
+  QEventLoop loop;
+  QTimer     timer;
+  timer.setSingleShot(true);
+  timer.setInterval(1000);  // 5 second timeout
+
+  connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+  connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+
+  timer.start();
+  loop.exec();
+
+  bool connected = (reply->error() == QNetworkReply::NoError);
+  reply->deleteLater();
+
+  return connected;
+}

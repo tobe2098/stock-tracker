@@ -286,20 +286,25 @@ MainWindow::MainWindow(QWidget *parent):
     // as a stop
   });
   QTimer::singleShot(0, this, [this]() {
-    for (const Stock &stock : trackedStocks) {
-      time_record_t now = QDateTime::currentSecsSinceEpoch();
-      if (stock.getLastQuoteFetchTime() != 0 && (now - stock.getLastQuoteFetchTime()) < QUOTE_CACHE_LIFETIME_SECS) {
-        statusMessage(QString("Current quote for '%1' is recent. Not fetching again.").arg(stock.getSymbol()), 3000);
-        continue;
-      }
-      // QMessageBox::information(this, "Fetching Data", QString("Current quote for '%1' is stale. Fetching...").arg(symbol));
-      statusMessage(QString("Current quote for '%1' is stale. Fetching...").arg(stock.getSymbol()), 500);
-      // Stock not in memory, fetch it for the first time
-      // QMessageBox::information(this, "New Stock", QString("Adding and fetching data for new stock '%1'...").arg(symbol));
-      // statusMessage(QString("Adding and fetching data for new stock '%1'...").arg(stock.getSymbol()), 500);
+    ConnectivityChecker checker;
+    if (checker.checkInternetConnection()) {
+      for (const Stock &stock : trackedStocks) {
+        time_record_t now = QDateTime::currentSecsSinceEpoch();
+        if (stock.getLastQuoteFetchTime() != 0 && (now - stock.getLastQuoteFetchTime()) < QUOTE_CACHE_LIFETIME_SECS) {
+          statusMessage(QString("Current quote for '%1' is recent. Not fetching again.").arg(stock.getSymbol()), 3000);
+          continue;
+        }
+        // QMessageBox::information(this, "Fetching Data", QString("Current quote for '%1' is stale. Fetching...").arg(symbol));
+        statusMessage(QString("Current quote for '%1' is stale. Fetching...").arg(stock.getSymbol()), 500);
+        // Stock not in memory, fetch it for the first time
+        // QMessageBox::information(this, "New Stock", QString("Adding and fetching data for new stock '%1'...").arg(symbol));
+        // statusMessage(QString("Adding and fetching data for new stock '%1'...").arg(stock.getSymbol()), 500);
 
-      // Instead of creating a dummy stock, request data from the fetcher
-      QMetaObject::invokeMethod(dataFetcher, "fetchStockData", Qt::QueuedConnection, Q_ARG(QString, stock.getSymbol()));
+        // Instead of creating a dummy stock, request data from the fetcher
+        QMetaObject::invokeMethod(dataFetcher, "fetchStockData", Qt::QueuedConnection, Q_ARG(QString, stock.getSymbol()));
+      }
+    } else {
+      statusMessage(QString("No internet connection detected, skipping data update."), 3000);
     }
   });
   //   dataFetcher->setAPIKey();
