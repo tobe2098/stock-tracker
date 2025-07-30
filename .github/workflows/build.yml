@@ -162,10 +162,8 @@ jobs:
     # Windows: Package with windeployqt
     - name: Package Windows application
       if: matrix.os == 'windows-latest'
+      working-directory: build
       run: |
-        # Move into build directory
-        cd build
-
         # Run windeployqt from the proper bin folder
         & "${env:Qt6_DIR}\bin\windeployqt.exe" ".\Release\stock-tracker.exe" --release --no-translations --no-system-d3d-compiler
 
