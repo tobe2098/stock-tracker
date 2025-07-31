@@ -29,16 +29,28 @@ StockListItemWidget::StockListItemWidget(const QString &symbol, const QString &d
   downloadButton->setFixedSize(24, 24);
   downloadButton->setToolTip(tr("Download historical data"));
   downloadButton->setText("\u21D3");
+  // "\u21D3"
   // Optional: Style the button for visual appeal
   downloadButton->setStyleSheet(
     "QPushButton { "
     "border: 1px solid palette(light); "
     "border-radius: 4px; "
-    // "background-color: palette(mid);"
-    "padding: 0px; "        // Remove all padding
-    "margin: 0px; "         // Remove margins
-    "text-align: center; "  // Center text
-    "font-size: 20px; "     // Adjust font size if needed
+    "background-color: rgb(25, 25, 25);"
+    "color: rgb(250,250,250);"
+    "padding: 0px; "                      // Remove all padding
+    "margin: 0px; "                       // Remove margins
+    "text-align: center; "                // Center text
+    "font-size: 20px; "                   // Adjust font size if needed
+    "  font-family: 'Segoe UI Symbol'; "  // Force a text font, not emoji font
+    "  font-variant-emoji: text; "        // CSS property to force text rendering
+    "}"
+    "QToolTip { "
+    "  color: rgb(255, 255, 255); "          // Tooltip text color
+    "  background-color: rgb(45, 45, 45); "  // Tooltip background
+    "  border: 1px solid rgb(80, 80, 80); "  // Tooltip border
+    "  border-radius: 3px; "                 // Rounded corners
+    "  padding: 4px; "                       // Internal spacing
+    "  font-size: 12px; "                    // Font size
     "}"
     "QPushButton:hover { "
     "background-color: palette(mid); "
@@ -53,16 +65,20 @@ StockListItemWidget::StockListItemWidget(const QString &symbol, const QString &d
   removeButton->setFixedSize(24, 24);  // Small fixed size for icon
   removeButton->setToolTip(tr("Remove from tracked list (RAM only)"));
   // Using Unicode character for the cross icon
-  removeButton->setText("\u274C");  // Red cross mark emoji
+  // removeButton->setText("\U0000232B");  // Red cross mark emoji
+  removeButton->setText("\U0001F5D9");  // Red cross mark emoji
   removeButton->setStyleSheet(
     "QPushButton { "
     "border: 1px solid palette(light); "
     "border-radius: 4px; "
-    // "background-color: palette(mid);"
-    "padding: 0px 1px 2px 2px;"  // top right bottom left
-    "margin: 0px; "              // Remove margins
-    "text-align: center; "       // Center text
-    "font-size: 16px; "          // Adjust font size if needed
+    "color: rgb(200,200,200);"
+    "background-color: rgb(25, 25, 25);"
+    "padding: 0px 0px 4px 0px;"           // top right bottom left
+    "margin: 0px; "                       // Remove margins
+    "text-align: center; "                // Center text
+    "font-size: 16px; "                   // Adjust font size if needed
+    "  font-family: 'Segoe UI Symbol'; "  // Force a text font, not emoji font
+    "  font-variant-emoji: text; "        // CSS property to force text rendering
     "}"
     "QPushButton:hover { "
     "background-color: palette(mid); "
@@ -86,11 +102,14 @@ StockListItemWidget::StockListItemWidget(const QString &symbol, const QString &d
     "QPushButton { "
     "border: 1px solid palette(light); "
     "border-radius: 4px; "
-    // "background-color: palette(mid);"
-    "padding: 0px; "        // Remove all padding
-    "margin: 0px; "         // Remove margins
-    "text-align: center; "  // Center text
-    "font-size: 16px; "     // Adjust font size if needed
+    "color: rgb(255,255,255);"
+    "background-color: rgb(25, 25, 25);"
+    "padding: 0px; "                      // Remove all padding
+    "margin: 0px; "                       // Remove margins
+    "text-align: center; "                // Center text
+    "font-size: 20px; "                   // Adjust font size if needed
+    "  font-family: 'Segoe UI Symbol'; "  // Force a text font, not emoji font
+    "  font-variant-emoji: text; "        // CSS property to force text rendering
     "}"
     "QPushButton:hover { "
     "background-color: palette(mid); "

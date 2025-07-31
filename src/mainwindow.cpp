@@ -67,6 +67,23 @@ MainWindow::MainWindow(QWidget *parent):
   // Instantiate QLineEdit for stock symbol input
   stockSymbolLineEdit = new QLineEdit(this);  // 'this' (MainWindow) is the parent
   stockSymbolLineEdit->setPlaceholderText("Enter stock symbol (e.g., AAPL)");
+  stockSymbolLineEdit->setStyleSheet(
+    "QLineEdit { "
+    "  background-color: rgb(35, 35, 35); "  // Input background
+    "  color: rgb(220, 220, 220); "          // Text color
+    "  border: 1px solid rgb(60, 60, 60); "  // Border
+    "  border-radius: 4px; "                 // Rounded corners
+    "  padding: 1px 2px; "                   // Internal spacing
+    "  font-size: 14px; "
+    "} "
+    "QLineEdit:focus { "
+    "  border-bottom: 1px solid red; "       // Blue border when focused
+    "  background-color: rgb(40, 40, 40); "  // Slightly lighter when focused
+    "} "
+    "QLineEdit::placeholder { "      // Placeholder text styling
+    "  color: rgb(140, 140, 140); "  // Dimmed placeholder color
+    "  font-style: italic; "         // Optional: italic placeholder
+    "} ");
   // stockSymbolLineEdit->setFixedHeight(26);
   addStockLayout->addWidget(stockSymbolLineEdit, 0, Qt::AlignVCenter);  // Add to the horizontal layout
 
@@ -95,12 +112,45 @@ MainWindow::MainWindow(QWidget *parent):
 
   // 4. Middle section: List of tracked stocks
   stockListWidget = new QListWidget(this);  // 'this' is the parent
-
+  stockListWidget->setStyleSheet(
+    "QListWidget { "
+    "  background-color: rgb(25, 25, 25); "  // List background
+    "  color: rgb(220, 220, 220); "          // Text color
+    "  border: 1px solid rgb(60, 60, 60); "  // Border
+    "  border-radius: 4px; "
+    "  padding: 4px; "
+    "  font-size: 13px; "
+    "  outline: none; "
+    "  show-decoration-selected: 1; "
+    "  height: 50px;"
+    "} "
+    "QListWidget::item { "
+    "height: 30px;"
+    "  padding: 2px 1px; "                          // Item spacing
+    "  border-bottom: 1px solid rgb(45, 45, 45); "  // Separator lines
+    "} "
+    "QListWidget::item:selected { "
+    "  background-color: rgb(80, 80, 80 ); "  // Selected item background
+    "  color: rgb(255, 255, 255); "           // Selected text color
+    "  outline: none;"
+    "} "
+    "QListWidget::item:hover:!selected { "
+    "  background-color: rgb(45, 45, 45); "  // Hover effect
+    "} ");
   // 5. Bottom section: Details of selected stock
   stockDetailsLabel = new QLabel("Select a stock to see details.", this);  // 'this' is the parent
   stockDetailsLabel->setWordWrap(true);                                    // Enable word wrapping for longer text
   stockDetailsLabel->setFrameStyle(QFrame::Panel | QFrame::Sunken);        // Add a simple border
   stockDetailsLabel->setMinimumHeight(100);                                // Give it some minimum height
+  stockDetailsLabel->setStyleSheet(
+    "QLabel {"
+    "  background-color: rgb(25, 25, 25); "  // List background
+    "  color: rgb(220, 220, 220); "          // Text color
+    "  border: 1px solid rgb(60, 60, 60); "  // Border
+    "  border-radius: 4px; "
+    "  padding: 4px; "
+    "  font-size: 16px; "
+    "}");
   // Move existing widgets/layouts into stockListLayout
   stockListLayout->addLayout(addStockLayout);  // The line edit and add button
   stockListLayout->addWidget(stockListWidget);
@@ -116,13 +166,13 @@ MainWindow::MainWindow(QWidget *parent):
   int buttonSize = 41;  // Choose your size
   settingsButton->setFixedSize(buttonSize, buttonSize);
   settingsButton->setStyleSheet(QString("QPushButton {"
-                                        "   border: 1px solid palette(light);"
+                                        "   border: 1px solid rgb(140,140,140);"
                                         "   border-radius: %1px;"  // Half the size for perfect circle
                                         "   background-color: palette(dark);"
                                         "   font-size: 22px;"
-                                        "   padding: 0px 1px 2px 2px;"  // top right bottom left
+                                        "   padding: 0px 1px 1px 2px;"  // top right bottom left
                                         "   margin-right: 9px;"
-                                        "   margin-bottom: 9px;"
+                                        "   margin-bottom: 10px;"
                                         "   text-align: center;"
                                         "}"
                                         "QPushButton:hover {"
@@ -131,7 +181,7 @@ MainWindow::MainWindow(QWidget *parent):
                                         "QPushButton:pressed {"
                                         "   background-color: palette(light);"
                                         "}")
-                                  .arg((buttonSize - 9) / 2));
+                                  .arg((buttonSize - 10) / 2));
   // QWidget     *buttonContainer = new QWidget(this);
   // QHBoxLayout *containerLayout = new QHBoxLayout(buttonContainer);
   // containerLayout->setContentsMargins(0, 5, 5, 5);  // top, left, bottom, right
@@ -184,7 +234,68 @@ MainWindow::MainWindow(QWidget *parent):
   QVBoxLayout *chartLayout = new QVBoxLayout(chartTab);
   stockChartView           = new AutoScaleChartView(this);  // Initialize QChartView
   stockSelector            = new QComboBox();
-  stockSelector->setMinimumWidth(100);
+  // stockSelector->setMinimumWidth(100);
+  stockSelector->setStyleSheet(
+    "QComboBox { "
+    "  background-color: rgb(35, 35, 35); "  // Main background
+    "  color: rgb(220, 220, 220); "          // Text color
+    "  border: 1px solid rgb(60, 60, 60); "  // Border
+    "  border-radius: 4px; "                 // Rounded corners
+    "  padding: 2px 2px; "                   // Internal spacing
+    "  font-size: 14px; "
+    "  min-width: 100px; "  // Minimum width
+    "} "
+    "QComboBox:hover { "
+    "  border: 1px solid rgb(80, 80, 80); "  // Lighter border on hover
+    "  background-color: rgb(40, 40, 40); "  // Slightly lighter background
+    "} "
+    "QComboBox:focus { "
+    "  border-bottom: 1px solid red; "  // Blue border when focused
+    "  outline: none; "
+    "} "
+    "QComboBox::drop-down { "
+    "  subcontrol-origin: padding; "
+    "  subcontrol-position: top right; "
+    "  width: 20px; "                           // Arrow button width
+    "  border-left: 1px solid rgb(70,70,70); "  // Separator line
+    "  background-color: rgb(50,50,50); "       // Arrow area background
+    "  border-top-right-radius: 3px; "
+    "  border-bottom-right-radius: 3px; "
+    "} "
+    "QComboBox::drop-down:hover { "
+    "  background-color: rgb(60,60,60); "  // Arrow area hover
+    "} "
+    "QComboBox::down-arrow { "
+    "  image: url(:/images/down-arrow-svgrepo-com.png); "  // Remove default arrow image
+    "  width: 12px;"
+    "  height : 12px;"
+    "  color : white;"
+    // "  border: none; "
+    "} "
+    "QComboBox::down-arrow:on { "                        // Custom arrow using CSS
+    "  image: url(:/images/up-arrow-svgrepo-com.png); "  // Remove default arrow image
+    "  color: rgb(180, 180, 180); "
+    "  font-size: 12px; "
+    "} "
+    "QComboBox QAbstractItemView { "  // Dropdown list styling
+    "  background-color: rgb(30, 30, 30); "
+    "  color: rgb(220, 220, 220); "
+    "  border: 1px solid rgb(60, 60, 60); "
+    "  border-radius: 4px; "
+    "  selection-background-color: rgb(90, 0, 0); "  // Selected item
+    "  selection-color: rgb(255, 255, 255); "
+    "  outline: none; "
+    "} "
+    "QComboBox QAbstractItemView::item { "
+    "  padding: 2px 2px; "  // Item spacing
+    "  border-bottom: 1px solid rgb(45, 45, 45); "
+    "} "
+    "QComboBox QAbstractItemView::item:hover { "
+    "  background-color: rgb(45, 45, 45); "  // Hover effect in dropdown
+    "} "
+    "QComboBox QAbstractItemView::item:selected { "
+    "  background-color: rgb(90, 0, 0); "
+    "}");
   QHBoxLayout *selectorLayout = new QHBoxLayout();
   QLabel      *selectorLabel  = new QLabel("Stock:");
   selectorLayout->addWidget(selectorLabel);
@@ -522,7 +633,7 @@ void MainWindow::updateStockListDisplay() {
 
     // Create a QListWidgetItem and set its size hint to match the custom widget's preferred size
     QListWidgetItem *item = new QListWidgetItem(stockListWidget);
-    item->setSizeHint(customItemWidget->sizeHint());  // Important for correct item height
+    // item->setSizeHint(QSize(-1, 40));  // Important for correct item height
     // This is the crucial line: Associate our custom widget with the QListWidgetItem
     stockListWidget->setItemWidget(item, customItemWidget);
     // Connect the custom widget's signals to MainWindow's new slots
@@ -837,6 +948,9 @@ void MainWindow::updateChart(const Stock &stock) {
   series->setBodyWidth(0.8);
   // Add data points to the series
   // QMap is sorted by key (QDate), so iterating gives chronological order
+  QPen thinPen(QColor("#888888"));
+  thinPen.setWidthF(1);  // Use setWidthF for subpixel width
+  series->setPen(thinPen);
   for (auto it = stock.getHistoricalPrices().constBegin(); it != stock.getHistoricalPrices().constEnd(); ++it) {
     // Convert QDate to QDateTime and then to milliseconds since epoch for QPointF
     const time_record_t        &date   = it.key();
@@ -844,26 +958,26 @@ void MainWindow::updateChart(const Stock &stock) {
 
     // Create a candlestick set:
     // Arguments: open, high, low, close, timestamp (in ms since epoch)
-    bool isValid = true;
-    if (record.high < record.low) {
-      qDebug() << "ERROR: High < Low at" << QDateTime::fromSecsSinceEpoch(date).toString();
-      qDebug() << "  High:" << record.high << "Low:" << record.low;
-      isValid = false;
-    }
-    if (record.open < record.low || record.open > record.high) {
-      qDebug() << "ERROR: Open outside range at" << QDateTime::fromSecsSinceEpoch(date).toString();
-      qDebug() << "  Open:" << record.open << "Range: [" << record.low << "," << record.high << "]";
-      isValid = false;
-    }
-    if (record.close < record.low || record.close > record.high) {
-      qDebug() << "ERROR: Close outside range at" << QDateTime::fromSecsSinceEpoch(date).toString();
-      qDebug() << "  Close:" << record.close << "Range: [" << record.low << "," << record.high << "]";
-      isValid = false;
-    }
+    // bool isValid = true;
+    // if (record.high < record.low) {
+    //   qDebug() << "ERROR: High < Low at" << QDateTime::fromSecsSinceEpoch(date).toString();
+    //   qDebug() << "  High:" << record.high << "Low:" << record.low;
+    //   isValid = false;
+    // }
+    // if (record.open < record.low || record.open > record.high) {
+    //   qDebug() << "ERROR: Open outside range at" << QDateTime::fromSecsSinceEpoch(date).toString();
+    //   qDebug() << "  Open:" << record.open << "Range: [" << record.low << "," << record.high << "]";
+    //   isValid = false;
+    // }
+    // if (record.close < record.low || record.close > record.high) {
+    //   qDebug() << "ERROR: Close outside range at" << QDateTime::fromSecsSinceEpoch(date).toString();
+    //   qDebug() << "  Close:" << record.close << "Range: [" << record.low << "," << record.high << "]";
+    //   isValid = false;
+    // }
 
-    if (!isValid) {
-      continue;  // Skip invalid data
-    }
+    // if (!isValid) {
+    //   continue;  // Skip invalid data
+    // }
     QCandlestickSet *set = new QCandlestickSet(record.open, record.high, record.low, record.close, date * 1000);
     series->append(set);
   }
@@ -880,7 +994,7 @@ void MainWindow::updateChart(const Stock &stock) {
   // Create custom X-axis for Date/Time
   QDateTimeAxis *axisX = new QDateTimeAxis();
   axisX->setFormat("dd/MM hh:mm");  // Format for dates
-  axisX->setTitleText("Date");
+  axisX->setTitleText("Time stamp");
   axisX->setTickCount(10);
   chart->addAxis(axisX, Qt::AlignBottom);  // or appropriate alignment
   series->attachAxis(axisX);

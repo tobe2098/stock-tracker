@@ -89,6 +89,8 @@ qt_add_resources(stock-tracker "resources"
     FILES
         # images/logo.png
         images/logo.ico
+        images/up-arrow-svgrepo-com.png
+        images/down-arrow-svgrepo-com.png
 )
 
 # Link libraries

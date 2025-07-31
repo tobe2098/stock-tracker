@@ -74,9 +74,47 @@ int main(int argc, char *argv[]) {
   darkPalette.setColor(QPalette::Disabled, QPalette::Highlight, disabledHighlightColor);
   darkPalette.setColor(QPalette::Disabled, QPalette::HighlightedText, disabledTextColor);
 
+  darkPalette.setColor(QPalette::Light, QColor(100, 100, 100));
+  darkPalette.setColor(QPalette::Shadow, QColor(0, 0, 0));
+  darkPalette.setColor(QPalette::Link, QColor(100, 150, 255));
+  darkPalette.setColor(QPalette::LinkVisited, QColor(150, 100, 255));
+
+  darkPalette.setColor(QPalette::Inactive, QPalette::Window, windowColor);
+  darkPalette.setColor(QPalette::Inactive, QPalette::WindowText, textColor);
+
   app.setPalette(darkPalette);
   // Optional: Use Fusion style which works well with dark palette
   // app.setStyle("Fusion");
+  app.setStyleSheet(
+    "QTabWidget::pane { "
+    "  background-color: rgb(30, 30, 30); "
+    "  border: 1px solid rgb(30, 30, 30); "
+    // "  border-radius: 5px; "  // All corners rounded equally
+    "  border-top-left-radius: 0px; "  // Keep sharp where active tab connects
+    "  border-top-right-radius: 0px; "
+    "  border-bottom-left-radius: 5px; "
+    "  border-bottom-right-radius: 5px; "
+    "} "
+    "QTabBar::tab { "
+    "  border: 1px solid rgb(30, 30, 30); "
+    "  background-color: rgb(50,50,50); "
+    "  color: rgb(200, 200, 200); "
+    "  border-top-left-radius: 5px; "
+    "  border-top-right-radius: 5px; "
+    "  border-bottom-left-radius: 0px; "
+    "  border-bottom-right-radius: 0px; "
+    "  min-width: 150px; "  // Minimum tab width
+    "  margin: 0px; "       // Space between tabs
+    "} "
+    "QTabBar::tab:selected { "
+    "  background-color: rgb(30, 30, 30); "
+    "  color: rgb(255, 255, 255); "  // Selected tab text color
+    "} "
+    "QTabBar::tab:hover:!selected { "
+    "  background-color: rgb(60,60,60); "
+    "  color: rgb(220, 220, 220); "
+    "}");
+
   // Show the main window
   mainWindow.show();
 

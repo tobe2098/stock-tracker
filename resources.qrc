@@ -2,5 +2,7 @@
 <RCC version="1.0">
     <qresource>
         <file>images/logo.ico</file>
+        <file>images/up-arrow-svgrepo-com.png</file>
+        <file>images/down-arrow-svgrepo-com.png</file>
     </qresource>
 </RCC>
