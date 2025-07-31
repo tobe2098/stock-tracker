@@ -1,8 +1,6 @@
 #ifndef _AUTOSCALE_HEADER_
 #define _AUTOSCALE_HEADER_
 
-#include <QCandleStickSeries>
-#include <QCandleStickSet>
 #include <QChart>
 #include <QChartView>
 #include <QDateTime>
@@ -10,6 +8,8 @@
 #include <QMouseEvent>
 #include <QValueAxis>
 #include <QWheelEvent>
+#include <QtCharts/QCandlestickSeries>
+#include <QtCharts/QCandlestickSet>
 
 class AutoScaleChartView : public QChartView {
     Q_OBJECT
