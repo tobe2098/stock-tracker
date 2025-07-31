@@ -2,10 +2,10 @@ name: Build StockTracker
 
 on:
   push:
-    # branches: [ main, develop ]
+    branches: [ main, develop ]
     tags: [ 'v*' ]
-  # pull_request:
-  #   branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 env:
   QT_VERSION: '6.6.0'
@@ -187,6 +187,7 @@ jobs:
           
           # Copy executable
           cp build/bin/stock-tracker build/bin/stock-tracker.app/Contents/MacOS/
+          chmod +x build/bin/stock-tracker.app/Contents/MacOS/stock-tracker
           
           # Create Info.plist
           cat > build/bin/stock-tracker.app/Contents/Info.plist << EOF
@@ -210,6 +211,8 @@ jobs:
             <string>APPL</string>
             <key>LSMinimumSystemVersion</key>
             <string>10.14</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
         </dict>
         </plist>
         EOF
@@ -220,17 +223,55 @@ jobs:
           fi
         fi
         
-        # Deploy Qt libraries
-        macdeployqt build/bin/stock-tracker.app -dmg
+        # Deploy Qt libraries to the app bundle
+        echo "Deploying Qt libraries..."
+        macdeployqt build/bin/stock-tracker.app -verbose=2
         
-        # Move DMG to predictable location
+        # Verify app bundle structure
+        echo "App bundle structure:"
+        find build/bin/stock-tracker.app -type f | head -20
+        
+        # Create distribution folder
         mkdir dist
-        if [ -f "build/bin/stock-tracker.dmg" ]; then
-          mv build/bin/stock-tracker.dmg dist/StockTracker.dmg
+        
+        # Create a ZIP (preserves app bundle structure better than tar)
+        echo "Creating ZIP archive..."
+        cd build/bin
+        zip -r ../../dist/StockTracker-macOS.zip stock-tracker.app
+        cd ../..
+        
+        # Create tar.gz with proper options for macOS
+        echo "Creating tar.gz archive..."
+        # Use gnutar if available (better compatibility), otherwise use system tar
+        if command -v gnutar >/dev/null 2>&1; then
+          gnutar --format=gnu -czf dist/StockTracker-macOS.tar.gz -C build/bin stock-tracker.app
         else
-          echo "DMG not created, creating archive instead"
+          # Use system tar with options that preserve resource forks and extended attributes
           tar -czf dist/StockTracker-macOS.tar.gz -C build/bin stock-tracker.app
         fi
+        
+        # Also create a simple folder structure for easy access
+        echo "Creating simple distribution folder..."
+        mkdir -p dist/StockTracker-macOS
+        cp -R build/bin/stock-tracker.app dist/StockTracker-macOS/
+        
+        # Create installation script
+        cat > dist/StockTracker-macOS/install.sh << 'EOF'
+        #!/bin/bash
+        echo "Installing StockTracker..."
+        cp -R stock-tracker.app /Applications/
+        echo "StockTracker has been installed to /Applications/"
+        echo "You can now find it in Launchpad or run it from Applications folder"
+        EOF
+        chmod +x dist/StockTracker-macOS/install.sh
+        
+        # Create simple tar.gz of the folder
+        tar -czf dist/StockTracker-macOS-Simple.tar.gz -C dist StockTracker-macOS
+        
+        echo "Created macOS packages:"
+        ls -la dist/
+        echo "ZIP contents:"
+        unzip -l dist/StockTracker-macOS.zip | head -10
 
     # Upload artifacts
     - name: Upload Ubuntu AppImage
@@ -249,14 +290,15 @@ jobs:
         name: ${{ matrix.artifact_name }}
         path: dist/
 
-    - name: Upload macOS DMG
+    - name: Upload macOS packages
       if: matrix.os == 'macos-latest'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
         path: |
-          dist/StockTracker.dmg
+          dist/StockTracker-macOS.zip
           dist/StockTracker-macOS.tar.gz
+          dist/StockTracker-macOS-Simple.tar.gz
 
   # Create release on tag push
   release:
@@ -300,11 +342,15 @@ jobs:
           cd ../..
         fi
         
-        # Handle macOS artifacts (DMG or tar.gz)
-        if [ -f "artifacts/StockTracker-macOS/StockTracker.dmg" ]; then
-          cp "artifacts/StockTracker-macOS/StockTracker.dmg" "release-assets/StockTracker-macOS.dmg"
-        elif [ -f "artifacts/StockTracker-macOS/StockTracker-macOS.tar.gz" ]; then
+        # Handle macOS artifacts (multiple options)
+        if [ -f "artifacts/StockTracker-macOS/StockTracker-macOS.zip" ]; then
+          cp "artifacts/StockTracker-macOS/StockTracker-macOS.zip" "release-assets/StockTracker-macOS.zip"
+        fi
+        if [ -f "artifacts/StockTracker-macOS/StockTracker-macOS.tar.gz" ]; then
           cp "artifacts/StockTracker-macOS/StockTracker-macOS.tar.gz" "release-assets/StockTracker-macOS.tar.gz"
+        fi
+        if [ -f "artifacts/StockTracker-macOS/StockTracker-macOS-Simple.tar.gz" ]; then
+          cp "artifacts/StockTracker-macOS/StockTracker-macOS-Simple.tar.gz" "release-assets/StockTracker-macOS-Simple.tar.gz"
         fi
         
         # List what we have
@@ -326,7 +372,7 @@ jobs:
           ## Downloads
           - **Linux**: Download the `.AppImage` file (or `.tar.gz` if AppImage failed)
           - **Windows**: Download and extract the ZIP file
-          - **macOS**: Download the `.dmg` file (or `.tar.gz` if DMG failed)
+          - **macOS**: Download and extract the ZIP file (or `.tar.gz` alternative)
           
           ## Installation
           ### Linux
@@ -344,13 +390,22 @@ jobs:
           2. Run `stock-tracker.exe`
           
           ### macOS
-          **DMG:**
-          1. Download the DMG file
-          2. Open it and drag StockTracker to Applications
+          ### macOS
+          **ZIP (Recommended):**
+          1. Download the ZIP file
+          2. Extract it: `unzip StockTracker-macOS.zip`
+          3. Drag `stock-tracker.app` to Applications folder
+          4. If blocked by security, right-click the app → "Open" → "Open" to bypass
           
-          **Tar.gz:**
+          **Simple tar.gz (Easy Installation):**
+          1. Download `StockTracker-macOS-Simple.tar.gz`
+          2. Extract: `tar -xzf StockTracker-macOS-Simple.tar.gz`
+          3. Run the install script: `cd StockTracker-macOS && ./install.sh`
+          4. Or manually drag `stock-tracker.app` to Applications
+          
+          **Regular tar.gz:**
           1. Download and extract: `tar -xzf StockTracker-macOS.tar.gz`
-          2. Run the app from the extracted folder
+          2. Double-click the extracted `stock-tracker.app` to run
         files: release-assets/*
         fail_on_unmatched_files: false
       env:
